@@ -1,89 +1,103 @@
-# Manga Loot Cube — A1 mini
+# Manga Cargo Crate — A1 mini
 
-A 178 mm bevelled cube that holds standing manga volumes: a drop-in slot in the
-top, a display window in the front, recessed panels and a lid seam for the
-Overwatch-loot-box look. One piece, no supports, no assembly.
+A two-part sci-fi cargo crate for standing manga volumes: corner castings,
+X-braced recessed panels, heavy latch blocks, a front viewing hatch and a
+banded lid. Body and lid lock together with a sliding dovetail. No supports,
+no glue, no hardware.
 
-![preview](docs/preview.png)
+![preview](docs/crate_preview.png)
 
 ```
 python3 -m pip install -r requirements.txt
-python3 src/manga_loot_cube.py --out stl      # writes the STL
-PYTHONPATH=src python3 src/verify.py          # geometry + printability checks
-PYTHONPATH=src python3 src/render.py --out docs
+python3 src/manga_crate.py --out stl            # writes both STLs
+PYTHONPATH=src python3 src/verify_crate.py      # geometry, fit, lock, printability
+PYTHONPATH=src python3 src/render_crate.py --out docs
 ```
 
-`stl/manga_loot_cube_a1mini.stl` is the print file.
+Print files: `stl/manga_crate_body.stl` and `stl/manga_crate_lid.stl`. Both are
+exported print-ready — the lid is already flipped crown-down.
 
-## The one constraint worth knowing before you print
+## Two constraints that shaped this
 
-A Viz shonen volume (Naruto, My Hero Academia) is **127 × 190.5 × ~20 mm**. The
-A1 mini's build volume is **180 × 180 × 180 mm**.
+**A manga volume is taller than the printer.** Viz shonen volumes (Naruto, My
+Hero Academia) are 127 × 190.5 × ~20 mm. The A1 mini's build volume is
+180 × 180 × 180 mm, so no single piece can enclose one standing up.
 
-The book is taller than the machine's maximum Z. No one-piece cube from this
-printer can fully swallow an upright volume, so this design doesn't pretend to:
-the volumes stand on the floor and their spines deliberately rise **17.5 mm
-proud of the top face**, framed by the slot, like a magazine caddy.
+**Splitting buys height, not width.** Each part still has to fit the 180 mm
+plate, and any 2-way split of a 210 mm cube leaves at least one piece carrying
+a full 210 × 210 cross-section. The largest square that fits inside a 180 mm
+cube is ~191 mm, so that piece cannot be printed in any orientation — a true
+210 mm cube needs 8 parts. Two parts gets you height only. Hence a
+cube-proportioned body with a lid, 178 × 178 × 205 mm assembled, rather than a
+true cube.
 
-The alternatives were measured and are worse:
+## The lock
 
-| approach | result |
-| --- | --- |
-| Books lying flat | 190 mm won't fit a 168 mm interior in any orientation |
-| Books leaning at 35–45° | Fits, but holds only 1–2 volumes |
-| Fully enclosed upright | Needs a ~210 mm cube, so a split multi-part print |
-| **Upright, spines proud** | **7 volumes, one piece — this design** |
+The lid **cannot slide the full length of the crate** — it descends over spines
+standing 19.5 mm above the body, so a full-length slide would drive its walls
+straight through the books. Instead:
 
-If you'd rather have the books fully hidden, that's the split-print route and
-it's a different model — say the word.
+1. Drop the lid on sitting **8 mm forward**. Three pairs of dovetail tenons
+   descend into drop-in pockets at the ends of their channels.
+2. Push the lid back until it is flush.
+3. Each tenon is now under its undercut lip. The lid cannot lift off.
+
+Verified in `verify_crate.py`, which sweeps the descent and the slide for
+collisions and then checks that lifting the locked lid is actually blocked:
+0.30 mm of vertical play before the dovetail bites.
 
 ## Specification
 
 | | |
 | --- | --- |
-| Exterior | 178 mm cube (1 mm plate margin each side) |
+| Assembled | 178 × 178 × 205 mm |
+| Body / lid | 178 × 178 × 178 mm / 178 × 178 × 33 mm |
 | Capacity | 7 volumes at 20 mm, or 6 comfortably |
-| Walls / floor | 5 mm |
-| Top slot | 140 × 133 mm, flared, funnelled |
-| Front window | 140 mm wide, 115 mm tall, 30 mm retaining lip |
-| Edge treatment | 9 mm edge chamfer, 17 mm corner chamfer |
-| Solid volume | 669 cm³ |
+| Walls / floor | 8 mm / 7 mm, 13 mm at the lid rim |
+| Front hatch | 116 × 98 mm, self-supporting head |
+| Lock | 6 dovetail tenons, 8 mm travel, 0.20 mm fit |
+| Solid volume | 757 cm³ body, 280 cm³ lid |
 
 ## Printing
 
-No supports anywhere. Every opening flares outward at 45°, and the internal
-funnel from the cavity to the slot is held clear of 45° on purpose, so the
-undersides bridge themselves. `verify.py` asserts this against the mesh.
+No supports on either part. Every opening flares 45°, the funnel into the lid
+rim is held clear of 45°, and both large recesses (the base shadow line and the
+crown) are narrow grooves rather than wide pockets, so nothing needs to bridge
+more than 10 mm. `verify_crate.py` asserts this against each part in its own
+print orientation.
 
 - **Supports:** off
 - **Layer height:** 0.2 mm
 - **Walls:** 3 perimeters
-- **Infill:** 10–15% gyroid — the 5 mm walls do the work
-- **Brim:** not needed; the flat 160 mm base is plenty of adhesion
-- **Filament:** roughly 450–550 g, and somewhere around 20–30 h. Slice it for
-  real numbers — that's an estimate from the solid volume, not a measurement.
+- **Infill:** 10–15% gyroid
+- **Orientation:** as exported. The lid prints crown-down, which puts its best
+  surface on the plate and leaves no internal overhang.
+- **Filament:** roughly 700–850 g for the pair. That's extrapolated from solid
+  volume — slice it for real numbers.
 
-The widest point is the middle of the cube; the base is 160 mm, and the walls
-flare out to 178 mm at 45°, which prints cleanly.
+If the dovetail is tight on your printer, raise `FIT`; if the lid rattles,
+lower it. 0.20 mm per side is the starting point.
 
 ## Changing it
 
-Everything lives in the `PARAMETERS` block at the top of
-`src/manga_loot_cube.py`. Change a number and re-run.
-
-`validate()` refuses parameter sets that would quietly produce a bad print —
-an opening whose flare would notch the edge chamfer, a slot too small for the
-book, a seam that cuts across the panels, walls left too thin under the
-grooves. `verify.py` then checks the built mesh itself: that the floor and
-walls exist, that the openings are open, that a volume can drop through the
-slot and clear the shell, and that nothing overhangs past 45° by more than a
-bridgeable 2.5 mm.
-
-Useful knobs:
+Everything is in the `PARAMETERS` block of `src/manga_crate.py`. Useful knobs:
 
 - `BOOK_DEPTH` / `BOOK_HEIGHT` / `BOOK_THICK` — retarget to another format
-  (VIZBIG omnibus is ~152 × 216 × 40 mm, and will need a split print)
-- `SLOT_W` — capacity, capped by the top edge chamfer
-- `EDGE_CHAMFER` / `CORNER_CHAMFER` — how soft the bevel reads
-- `PANEL_INSET` / `PANEL_DEPTH` — the recessed face panels
+- `TOTAL_H`, `SPLIT` — overall height and where the seam falls
+- `RELIEF_FRAME` / `RELIEF_FIELD` — how deep the panel relief cuts
+- `POST_L`, `BRACE_W`, `LATCH_W` — the crate detailing
+- `TRAVEL`, `DT_*`, `FIT` — the dovetail
 - `MARGIN` — raise it if your plate complains at 178 mm
+
+Two structural rules the code relies on, worth knowing before editing:
+
+- All exterior relief is **cut from** the 178 mm envelope, never added to a
+  smaller body, so no detailing can push a part past the build plate.
+- `skin_side()` exists because `profile()` insets in Z as well as X and Y, so a
+  plain `skin()` carries full-width slabs at the crown and base. Cutting with
+  those shaves the ends; clipping them off in Z instead lands a cut plane on
+  the inset profile's end face and detaches them into separate bodies. Use
+  `skin()` only for detail on the crown or the base.
+
+The earlier single-piece 178 mm cube version is in git history at the first
+commit on this branch.

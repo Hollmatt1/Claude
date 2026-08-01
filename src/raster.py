@@ -1,21 +1,14 @@
 #!/usr/bin/env python3
-"""Shaded preview images of the cube, including cutaways and a loaded view.
+"""A small orthographic z-buffer rasteriser for previewing solids.
 
-Uses a small orthographic z-buffer rasteriser rather than matplotlib's 3D
-axes: matplotlib sorts whole collections back-to-front, which puts the manga
-in front of the wall that should hide them and drops faces at the openings.
-
-    python3 src/render.py --out docs/
+Model-agnostic on purpose. matplotlib's 3D axes sort whole collections
+back-to-front, which puts contents in front of the wall that should hide them
+and drops faces at openings, so previews here are rasterised directly.
 """
 
 from __future__ import annotations
 
-import argparse
-import os
-
 import numpy as np
-
-import manga_loot_cube as M
 
 BG = np.array([1.0, 1.0, 1.0])
 LIGHT = np.array([0.40, 0.62, 0.68])
@@ -33,11 +26,15 @@ def camera(elev_deg: float, azim_deg: float) -> np.ndarray:
     return np.stack([right, true_up, fwd])
 
 
-def rasterise(parts, elev, azim, px=900, pad=1.06):
-    """parts: list of (Manifold, rgb). Returns an HxWx3 float image."""
+def rasterise(parts, elev, azim, to_tri, half, px=900, pad=1.06):
+    """parts: list of (Manifold, rgb). Returns an HxWx3 float image.
+
+    `to_tri` converts a solid to a trimesh; `half` is the orthographic
+    half-extent of the view.
+    """
     tris, cols = [], []
     for solid, colour in parts:
-        mesh = M.to_trimesh(solid)
+        mesh = to_tri(solid)
         t = mesh.vertices[mesh.faces]
         tris.append(t)
         cols.append(np.repeat(np.array(colour)[None, :], len(t), axis=0))
@@ -47,12 +44,19 @@ def rasterise(parts, elev, azim, px=900, pad=1.06):
     n = np.cross(tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0])
     n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
     lam = 0.26 + 0.74 * np.clip(n @ LIGHT, 0.0, 1.0)
-    shade = np.clip(cols * lam[:, None], 0, 1)
 
     R = camera(elev, azim)
     cam = tris @ R.T                      # (T,3,3) -> x,y screen, z depth
 
-    half = M.H * np.sqrt(3.0) * pad
+    # Depth cue. Without it a recess reads as flat: the inside of a back wall
+    # shares its normal with the front face, so pure Lambertian shading gives
+    # the two identical colour and openings vanish.
+    dm = cam[:, :, 2].mean(axis=1)
+    lo, hi = dm.min(), dm.max()
+    fog = 1.0 - 0.42 * (hi - dm) / max(hi - lo, 1e-9)
+    shade = np.clip(cols * (lam * fog)[:, None], 0, 1)
+
+    half = half * pad
     scale = px / (2 * half)
     sx = (cam[:, :, 0] + half) * scale
     sy = (half - cam[:, :, 1]) * scale    # flip: image rows go down
@@ -93,62 +97,3 @@ def rasterise(parts, elev, azim, px=900, pad=1.06):
         img[y0:y1, x0:x1][win] = shade[i]
 
     return img
-
-
-def books(n=7, colour=(0.85, 0.51, 0.14)):
-    floor_z = -M.H + M.FLOOR
-    span = n * M.BOOK_THICK
-    out = []
-    for i in range(n):
-        x0 = -span / 2 + i * M.BOOK_THICK
-        shade = 0.82 + 0.18 * ((i % 3) / 2.0)
-        out.append((M.box(x0 + 0.7, x0 + M.BOOK_THICK - 0.7,
-                          -M.BOOK_DEPTH / 2, M.BOOK_DEPTH / 2,
-                          floor_z, floor_z + M.BOOK_HEIGHT),
-                    tuple(c * shade for c in colour)))
-    return out
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default="docs")
-    ap.add_argument("--px", type=int, default=900)
-    args = ap.parse_args()
-    os.makedirs(args.out, exist_ok=True)
-
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    shell = M.build()
-    body = (0.36, 0.42, 0.86)
-
-    # front face is +Y, so the camera wants azimuth 90
-    views = [
-        ("three-quarter", [(shell, body)], 24, 62),
-        ("front", [(shell, body)], 8, 90),
-        ("top, showing the slot", [(shell, body)], 62, 74),
-        ("loaded with 7 volumes", [(shell, body)] + books(), 24, 62),
-        ("cutaway", [(shell - M.box(0, M.BIG, 0, M.BIG, -M.BIG, M.BIG), body)],
-         24, 62),
-        ("section through the channel",
-         [(shell - M.box(-M.BIG, M.BIG, -M.BIG, 0, -M.BIG, M.BIG), body)]
-         + [(b - M.box(-M.BIG, M.BIG, -M.BIG, 0, -M.BIG, M.BIG), c)
-            for b, c in books()],
-         6, 84),
-    ]
-
-    fig, axes = plt.subplots(2, 3, figsize=(15, 10.4), dpi=120)
-    for ax, (title, parts, elev, azim) in zip(axes.ravel(), views):
-        ax.imshow(rasterise(parts, elev, azim, px=args.px))
-        ax.set_title(title, fontsize=12)
-        ax.axis("off")
-    fig.tight_layout()
-    path = os.path.join(args.out, "preview.png")
-    fig.savefig(path, facecolor="white", bbox_inches="tight")
-    plt.close(fig)
-    print("wrote", path)
-
-
-if __name__ == "__main__":
-    main()
