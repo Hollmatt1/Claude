@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""A true 216 mm sci-fi cargo cube for manga, printed in 12 parts.
+"""A true 264 mm loot-crate cube for manga, printed in 12 parts.
 
-The cube is 216 mm on every side, so no piece of it fits the A1 mini's
+The cube is 264 mm on every side, so no piece of it fits the A1 mini's
 180 x 180 x 180 mm plate whole. It is split on all three axes into eight
-108 mm octants, plus four spline keys.
+octants, plus four spline keys.
+
+The exterior copies crate C from the reference art: light corner posts and a
+deep top cap band standing at the envelope, field panels recessed between them
+carrying a latch plate, a louver recess and small label placards.
 
 Why eight and not two: any 2-way split of a cube over 180 mm leaves at least
 one piece carrying a full-width cross-section, and the largest square that fits
@@ -89,16 +93,23 @@ POST_L = 30.0                 # corner castings
 SEAM_W = 6.0                  # strap sitting on each split
 SEAM_Z = 176.0                # the tier split, at two thirds height: this is
                               # the lid line, which is what a loot box reads by
-RAIL_H = 30.0                 # rails at the base and crown
-PANEL_R = 22.0                # rounded panel corners, not chamfered ones
+# Crate C from the reference: light corner posts and a deep top cap band
+# standing at the envelope, yellow field panels recessed between them, a latch
+# plate on the centre of each face, and small label placards.
+BASE_H = 26.0                 # foot band
+CAP_H = 46.0                  # top cap band - the deep light lid
+PANEL_R = 18.0                # rounded panel corners
 BEVEL_STEP = 2.0
 BOLT_R = 3.4
-DIAG_W = 30.0                 # the diagonal band, corner to corner
-EMBLEM_R = 30.0               # disc plate on the side and back faces
-EMBLEM_HUB = 13.0
-EMBLEM_D = 1.6
-EMBLEM_U = 52.0               # offset clear of the vertical seam strap
-EMBLEM_Z = 104.0
+PLATE = (84.0, 26.0)          # raised latch plate on the centre of a face
+PLATE_Z = 150.0
+VENT = (120.0, 16.0)          # wide shallow louver recess low on the panel
+VENT_Z = 62.0
+VENT_D = 2.5
+PLACARD = (34.0, 16.0)        # small label plate
+PLACARD_Z = 196.0
+PLACARD_U = 52.0
+PLACARD_D = 1.4
 
 # --- tier lock: cap octants slide into blind dovetail channels ---
 TRAVEL = 8.0
@@ -266,35 +277,13 @@ def bolt_heads() -> Manifold:
     for axis in (0, 1):
         for sign in (1, -1):
             for u in (HX - POST_L / 2, -(HX - POST_L / 2)):
-                for h in (RAIL_H / 2, SEAM_Z / 2, SEAM_Z + 38.0,
-                          SIDE - RAIL_H / 2):
+                for h in (BASE_H / 2, 92.0, SIDE - CAP_H / 2 - 14,
+                          SIDE - CAP_H / 2 + 12):
                     c = Manifold.cylinder(60.0, BOLT_R, BOLT_R, 24, True)
                     c = (c.rotate([0, 90, 0]).translate([sign * HX, u, zc(h)])
                          if axis == 0 else
                          c.rotate([90, 0, 0]).translate([u, sign * HY, zc(h)]))
                     out = c if out is None else out + c
-    return out
-
-
-def diagonal_band() -> Manifold:
-    """One bold diagonal running corner to corner on each of the four faces.
-
-    A genuinely diagonal *split* cannot be printed: wedges cut on the cube's
-    vertical diagonals have a 264 x 132 footprint, and 264 exceeds the plate.
-    Tilting the tier plane instead only buys about 12 degrees before one tier
-    grows past 180 mm, and it would put the cap lock on a sloped mating face.
-    So the diagonal is carried by the surface: a raised band, wide enough to be
-    the thing you read, with the joints demoted to thin straps behind it.
-    """
-    u = HX - POST_L
-    z0, z1 = RAIL_H, SIDE - RAIL_H
-    out = None
-    for axis, sign in ((0, 1), (0, -1), (1, -1), (1, 1)):
-        ends = [_face(axis, sign, uu - DIAG_W / 2, uu + DIAG_W / 2,
-                      zz - DIAG_W / 2, zz + DIAG_W / 2)
-                for uu, zz in ((-u, z0), (u, z1))]
-        band = Manifold.batch_hull(ends)
-        out = band if out is None else out + band
     return out
 
 
@@ -325,24 +314,32 @@ def rounded(axis, sign, u0, u1, z0, z1, r, grow=0.0):
 
 
 def face_panel(axis, sign, grow=0.0):
-    """The single rounded panel filling one face."""
+    """The recessed field panel: everything the posts and bands do not cover."""
     u = HX - POST_L
-    return rounded(axis, sign, -u, u, RAIL_H, SIDE - RAIL_H, PANEL_R, grow)
+    return rounded(axis, sign, -u, u, BASE_H, SIDE - CAP_H, PANEL_R, grow)
 
 
-def disc(axis, sign, r):
-    """A disc on one face, offset sideways so the seam strap does not bisect it."""
-    c = Manifold.cylinder(BIG, r, r, 64, True)
-    c = (c.rotate([0, 90, 0]).translate([0, EMBLEM_U, zc(EMBLEM_Z)])
-         if axis == 0 else
-         c.rotate([90, 0, 0]).translate([EMBLEM_U, 0, zc(EMBLEM_Z)]))
-    return c ^ _face(axis, sign, -BIG, BIG, -BIG, BIG)
+def plate(axis, sign):
+    """The raised latch plate on the centre of a face."""
+    w, h = PLATE
+    return rounded(axis, sign, -w / 2, w / 2, PLATE_Z - h / 2, PLATE_Z + h / 2, 8.0)
 
 
-def emblem(axis, sign):
-    """A recessed disc plate with a raised hub, centred on the face."""
-    ring = disc(axis, sign, EMBLEM_R) - disc(axis, sign, EMBLEM_HUB)
-    return ring ^ skin_side(RELIEF_FIELD, RELIEF_FIELD + EMBLEM_D)
+def vent(axis, sign):
+    """A wide, shallow louver recess low on the field panel."""
+    w, h = VENT
+    return rounded(axis, sign, -w / 2, w / 2, VENT_Z - h / 2, VENT_Z + h / 2, 6.0)
+
+
+def placard(axis, sign):
+    """Two small label plates, as on the reference crate."""
+    w, h = PLACARD
+    out = None
+    for u in (PLACARD_U, -PLACARD_U):
+        r = rounded(axis, sign, u - w / 2, u + w / 2,
+                    PLACARD_Z - h / 2, PLACARD_Z + h / 2, 4.0)
+        out = r if out is None else out + r
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -353,23 +350,34 @@ def build_assembly() -> Manifold:
     solid = profile()
 
     # step the vertical faces back, sparing only the bolt heads
-    spared = bolt_heads() + seam_ribs() + diagonal_band()
-    solid -= skin_side(0.0, RELIEF_FRAME) - spared
+    spared = bolt_heads() + seam_ribs()
 
-    # one rounded panel per face: bevel lip, then floor
+    # everything steps back to the frame plane except the bolt heads and the
+    # latch plates, which stay at the envelope like the reference crate's
     faces = ((0, 1), (0, -1), (1, -1))
+    plates = None
+    for axis, sign in faces:
+        pl = plate(axis, sign)
+        plates = pl if plates is None else plates + pl
+    solid -= skin_side(0.0, RELIEF_FRAME) - spared - plates
+
+    # the field panel: bevel lip, then floor. What it does not reach becomes
+    # the corner posts, the foot band and the deep top cap.
     bevels = fields = None
     for axis, sign in faces:
         b = face_panel(axis, sign, grow=BEVEL_STEP)
         f = face_panel(axis, sign)
         bevels = b if bevels is None else bevels + b
         fields = f if fields is None else fields + f
-    solid -= (skin_side(RELIEF_FRAME, RELIEF_BEVEL) ^ bevels) - spared
-    solid -= (skin_side(RELIEF_BEVEL, RELIEF_FIELD) ^ fields) - spared
+    solid -= (skin_side(RELIEF_FRAME, RELIEF_BEVEL) ^ bevels) - spared - plates
+    solid -= (skin_side(RELIEF_BEVEL, RELIEF_FIELD) ^ fields) - spared - plates
 
-    # emblem plate on the sides and back
+    # louver recess low on each panel, label plates high on it
     for axis, sign in faces:
-        solid -= emblem(axis, sign) - spared
+        solid -= ((vent(axis, sign) ^ face_panel(axis, sign))
+                  ^ skin_side(RELIEF_FIELD, RELIEF_FIELD + VENT_D))
+        solid -= ((placard(axis, sign) ^ face_panel(axis, sign))
+                  ^ skin_side(RELIEF_FIELD, RELIEF_FIELD + PLACARD_D))
 
     # crown grooves, narrow enough to bridge when a cap octant prints crown-down
     crown = (box(-66, 66, -66, 66, zc(SIDE - 6), BIG)

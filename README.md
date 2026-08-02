@@ -9,13 +9,18 @@ snug on all four sides, standing 3 mm proud so you can grip a spine. No
 dividers, so nothing draws a line across the front. No open bay, no lid to
 lift.
 
-Loot-box styling: a big even soft bevel on every edge and corner, rounded
-panels rather than chamfered ones, a **bold diagonal band** corner to corner on
-every face, a disc emblem plate, corner castings with bolt heads, and the
-**lid line at two-thirds height** — which is where the
-tier split actually falls, so the structural seam is the styling. Detail runs
+The exterior copies **crate C** from the reference art: light corner posts and
+a deep top cap band standing at the envelope, field panels recessed between
+them, a latch plate on the centre of each face, a wide louver recess low on the
+panel, and small label placards. A big even soft bevel on every edge and
+corner. The **lid line sits at two-thirds height**, which is where the tier
+split actually falls — the structural seam is the styling. Detail runs
 **across** the joints rather than stopping at them, and each split hides under
 a 6 mm strap, so eight octants read as one object.
+
+Nothing about the styling changed how it cuts: all relief is subtracted from
+the 264 mm envelope, so the split planes, the locks and the print orientations
+are untouched.
 
 ![preview](docs/cube_preview.png)
 
@@ -39,14 +44,13 @@ coarsest split that works: eight 108 mm octants, plus four spline keys.
 carry the cap's dovetail channels. At 224 mm that margin falls to 11 mm and the
 lock has nowhere to live.
 
-## Why the diagonal is a graphic, not a split
+## What the reference could not give us
 
-A genuinely diagonal *split* cannot be printed. Wedges cut on the cube's
-vertical diagonals have a 264 × 132 mm footprint, and 264 exceeds the 180 mm
-plate in any orientation. Tilting the tier plane instead buys only about 12°
-of slope before one tier grows past 180 mm, and it would put the cap lock on a
-sloped mating face. So the diagonal is carried by the surface — a raised band
-wide enough to be the thing you read — with the joints demoted to thin straps.
+Crate C's corner posts are far chunkier than these. They cannot be: the pocket
+for ten volumes is 202 mm of the 264 mm face, so only 31 mm of margin remains
+either side, and the posts have to live in it. The front face is mostly pocket
+for the same reason, so the crate styling is carried by the other three faces,
+the cap band and the foot band.
 
 ## How it locks
 
@@ -90,7 +94,7 @@ also pulls a base octant sideways and checks it fouls its key.
 | Floor / ceiling | 34 / 36 mm |
 | Lid line / tier split | 176 mm, two-thirds height |
 | Cap lock | 8 dovetail tenons, 8 mm travel, blind channels, 0.20 mm fit |
-| Material | 10135 cm³ solid across all parts |
+| Material | 9980 cm³ solid across all parts |
 
 ## Printing
 
@@ -117,7 +121,8 @@ Everything lives in the `PARAMETERS` block of `src/manga_cube.py`.
 
 - `N_BOOKS` — capacity, and the thing that sets `SIDE`
 - `SIDE` — the cube. Below ~213 mm the book no longer fits standing
-- `DIAG_W` — the diagonal band
+- `BASE_H`, `CAP_H`, `POST_L`, `PLATE`, `VENT`, `PLACARD` — the crate C
+  exterior. `POST_L` is capped by the pocket margin
 - `N_BOOKS`, `SLOT_*`, `BOOK_*` — the pocket and the media it is cut for
 - `EDGE_CH` / `CORNER_CH`, `PANEL_R`, `EMBLEM_*`, `SEAM_Z` — the loot-box look:
   bevel size, panel corner radius, the disc plate, and the lid line
@@ -161,6 +166,10 @@ six-volume cube — are in git history on this branch.
 ## Two-tone
 
 Printing the four `cap_*` parts and the keys in cream and the four `base_*`
-parts in yellow reproduces the yellow crate from the reference art directly:
-the cap is the top third of the cube, so the split is already in the right
-place. No design change needed.
+parts in yellow puts the light band across the top third, which is where crate
+C's light lid sits.
+
+It will not colour the corner posts, though — those run the full height and so
+are split between both tiers. Matching the reference exactly needs either a
+multi-colour print or the posts broken out as separate clip-on pieces, which
+would add four more parts.

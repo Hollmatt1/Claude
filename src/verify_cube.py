@@ -198,7 +198,8 @@ def main() -> int:
     total = sum(p.volume() for p in parts.values())
     print()
     print(f"assembled       : {C.SIDE:.0f} mm cube, true on all axes")
-    print(f"parts           : 8 octants at 108 mm + 4 spline keys")
+    print(f"parts           : 8 octants ({C.SEAM_Z:.0f} mm base, "
+          f"{C.SIDE - C.SEAM_Z:.0f} mm cap) + 4 spline keys")
     print(f"capacity        : {capacity} x {C.BOOK_THICK:.0f} mm volumes")
     print(f"material        : {total/1000:.0f} cm^3 solid across all parts")
     print(f"cap lock        : {len(C.TEN_AT)*2} tenons, {C.TRAVEL:.0f} mm travel,"
