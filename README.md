@@ -1,120 +1,116 @@
-# Manga Cargo Crate — A1 mini
+# Manga Cargo Cube — A1 mini
 
-A two-part sci-fi cargo crate for standing manga volumes. Body and lid lock
-together with a sliding dovetail. No supports, no glue, no hardware.
+A **true 216 mm cube** — same on every axis — printed in 12 parts that lock
+together with no glue, no screws and no supports. Sci-fi cargo crate detailing:
+corner castings, bolted seam straps, octagonal machined panels with X-bracing,
+louver vent banks, hazard-striped rails and a framed front hatch.
 
-Detailing, all cut into the envelope rather than added onto it:
-
-- **Corner castings** running the full height, with **bolt heads** down each one
-- **Octagonal recessed panels** with a stepped bevel lip, so they read machined
-  rather than routed
-- **X-bracing** across the side and back panels
-- **Louver vent banks**, five slots per face, sunk below the panel floor
-- **Hazard striping** — 45 degree ribs in the band around the lid
-- **Latch blocks** straddling the seam, the one detail at the full envelope
-- **Front hatch** with a recessed label placard above it
-- Base shadow line and a grooved crown with grip slots
-
-![preview](docs/crate_preview.png)
+![preview](docs/cube_preview.png)
 
 ```
 python3 -m pip install -r requirements.txt
-python3 src/manga_crate.py --out stl            # writes both STLs
-PYTHONPATH=src python3 src/verify_crate.py      # geometry, fit, lock, printability
-PYTHONPATH=src python3 src/render_crate.py --out docs
+python3 src/manga_cube.py --out stl          # writes all 12 STLs
+PYTHONPATH=src python3 src/verify_cube.py    # parts, fit, locks, printability
+PYTHONPATH=src python3 src/render_cube.py --out docs
 ```
 
-Print files: `stl/manga_crate_body.stl` and `stl/manga_crate_lid.stl`. Both are
-exported print-ready — the lid is already flipped crown-down.
+## Why 12 parts
 
-## Two constraints that shaped this
+A 216 mm cube has no piece that fits the A1 mini's 180 mm plate whole. Any
+2-way split of a cube over 180 mm leaves at least one piece carrying a
+full-width cross-section, and the largest square that fits inside a 180 mm cube
+is only ~191 mm — so **all three axes have to be split**. 2 × 2 × 2 is the
+coarsest split that works: eight 108 mm octants, plus four spline keys.
 
-**A manga volume is taller than the printer.** Viz shonen volumes (Naruto, My
-Hero Academia) are 127 × 190.5 × ~20 mm. The A1 mini's build volume is
-180 × 180 × 180 mm, so no single piece can enclose one standing up.
+216 mm is the smallest cube that still swallows a standing Viz shonen volume
+(190.5 mm) behind a 12 mm floor and a 10 mm ceiling, with 3.5 mm to spare.
 
-**Splitting buys height, not width.** Each part still has to fit the 180 mm
-plate, and any 2-way split of a 210 mm cube leaves at least one piece carrying
-a full 210 × 210 cross-section. The largest square that fits inside a 180 mm
-cube is ~191 mm, so that piece cannot be printed in any orientation — a true
-210 mm cube needs 8 parts. Two parts gets you height only. Hence a
-cube-proportioned body with a lid, 178 × 178 × 205 mm assembled, rather than a
-true cube.
+## How it locks
 
-## The lock
+The hard part is that **four pieces in a closed ring cannot all use the same
+sliding joint** — the last one would have to slide two directions at once. So
+the two tiers lock differently:
 
-The lid **cannot slide the full length of the crate** — it descends over spines
-standing 19.5 mm above the body, so a full-length slide would drive its walls
-straight through the books. Instead:
+**Lower ring** — the four base octants butt together, then four dovetail
+spline keys drop down the vertical seams. Each key is a *bowtie* in section,
+widest at both roots and pinched at the seam, so neither octant can pull away
+sideways. Once the cap is on, the keys are trapped and cannot back out.
 
-1. Drop the lid on sitting **8 mm forward**. Three pairs of dovetail tenons
-   descend into drop-in pockets at the ends of their channels.
-2. Push the lid back until it is flush.
-3. Each tenon is now under its undercut lip. The lid cannot lift off.
+**Cap** — each upper octant locks to the body **on its own**: set it down 8 mm
+forward, lower it so two dovetail tenons drop into their pockets, then slide it
+back. The channels are blind, so it stops exactly flush. Because no cap piece
+depends on its neighbours, the ring-of-four problem never arises.
 
-Verified in `verify_crate.py`, which sweeps the descent and the slide for
-collisions and then checks that lifting the locked lid is actually blocked:
-0.30 mm of vertical play before the dovetail bites.
+`verify_cube.py` proves the mechanism rather than assuming it: for every cap
+octant it sweeps the descent and the slide for collisions, confirms the blind
+channel stops it (43 mm³ of interference if pushed 1 mm past flush), and
+confirms it cannot be lifted — 0.60 mm of play before the dovetail bites. It
+also pulls a base octant sideways and checks it fouls its key.
+
+## Assembly
+
+1. Butt the four `base_*` octants together on a flat surface.
+2. Drop `key_1`–`key_4` down the vertical seams (three long, one short in the
+   hatch sill). The lower ring is now locked laterally.
+3. For each `cap_*` octant: set it on its quarter 8 mm forward, lower it, slide
+   it back until it stops. It is now locked down and the keys beneath are
+   captive.
+
+Loading works either way — through the front hatch, or by sliding one cap
+octant forward and lifting it off.
 
 ## Specification
 
 | | |
 | --- | --- |
-| Assembled | 178 × 178 × 205 mm |
-| Body / lid | 178 × 178 × 178 mm / 178 × 178 × 33 mm |
-| Capacity | 7 volumes at 20 mm, or 6 comfortably |
-| Walls / floor | 10 mm / 7 mm, 13 mm at the lid rim |
-| Front hatch | 116 × 98 mm, self-supporting head |
-| Lock | 6 dovetail tenons, 8 mm travel, 0.20 mm fit |
-| Solid volume | 861 cm³ body, 276 cm³ lid |
+| Assembled | 216 × 216 × 216 mm, true cube |
+| Parts | 8 octants at 108 mm + 4 spline keys |
+| Capacity | 6 volumes at 20 mm |
+| Walls / floor / ceiling | 12 / 12 / 10 mm |
+| Front hatch | 126 × 124 mm, self-supporting head |
+| Cap lock | 8 dovetail tenons, 8 mm travel, blind channels, 0.20 mm fit |
+| Material | 2197 cm³ solid across all parts |
 
 ## Printing
 
-No supports on either part. Every opening flares 45°, the funnel into the lid
-rim is held clear of 45°, and both large recesses (the base shadow line and the
-crown) are narrow grooves rather than wide pockets, so nothing needs to bridge
-more than 10 mm. `verify_crate.py` asserts this against each part in its own
-print orientation.
+No supports anywhere. All relief is cut into the envelope, openings flare 45°,
+and both wide recesses are narrow grooves instead, so nothing bridges more than
+10 mm. `verify_cube.py` asserts this against each part in its own orientation.
 
-- **Supports:** off
-- **Layer height:** 0.2 mm
-- **Walls:** 3 perimeters
-- **Infill:** 10–15% gyroid
-- **Orientation:** as exported. The lid prints crown-down, which puts its best
-  surface on the plate and leaves no internal overhang.
-- **Filament:** roughly 750–900 g for the pair. That's extrapolated from solid
-  volume — slice it for real numbers.
+- **Supports:** off · **Layer:** 0.2 mm · **Walls:** 3 · **Infill:** 10–15%
+- **Orientation:** as exported. Base octants sit floor-down, cap octants are
+  already flipped crown-down, keys stand on end.
+- **Filament:** roughly 1.0–1.3 kg for the set. A 12 mm wall prints mostly
+  hollow, so this is well under the 2197 cm³ solid figure — but it is an
+  estimate, so slice it for real numbers. Expect a long queue of 12 prints.
 
-If the dovetail is tight on your printer, raise `FIT`; if the lid rattles,
-lower it. 0.20 mm per side is the starting point.
+If the dovetails or keys are tight on your printer, raise `FIT`; if they
+rattle, lower it. 0.20 mm per side is the starting point.
 
 ## Changing it
 
-Everything is in the `PARAMETERS` block of `src/manga_crate.py`. Useful knobs:
+Everything lives in the `PARAMETERS` block of `src/manga_cube.py`.
 
-- `BOOK_DEPTH` / `BOOK_HEIGHT` / `BOOK_THICK` — retarget to another format
-- `TOTAL_H`, `SPLIT` — overall height and where the seam falls
-- `RELIEF_FRAME` / `RELIEF_BEVEL` / `RELIEF_FIELD` / `RELIEF_VENT` — the four
-  relief planes, shallowest to deepest. `RELIEF_VENT` must stay well clear of
-  `WALL`, or the louvers cut through
-- `PANEL_CHAMFER`, `BEVEL_STEP` — the octagonal panel shape and its lip
-- `VENT_N` / `VENT_PITCH`, `BOLT_R` / `BOLT_Z`, `STRIPE_PITCH` — the greebling
-- `POST_L`, `BRACE_W`, `LATCH_W` — castings, bracing, latches
-- `TRAVEL`, `DT_*`, `FIT` — the dovetail
-- `MARGIN` — raise it if your plate complains at 178 mm
+- `SIDE` — the cube. Below ~213 mm the book no longer fits standing
+- `BAY`, `BOOK_*` — the bay and the media it is cut for
+- `RELIEF_FRAME` / `_BEVEL` / `_FIELD` / `_VENT` — the four relief planes.
+  `RELIEF_VENT` must stay well clear of `WALL` or the louvers cut through
+- `POST_L`, `STRAP_W`, `BAND_H`, `VENT_N`, `BOLT_R`, `STRIPE_PITCH` — greebling
+- `TRAVEL`, `DT_*`, `KEY_*`, `FIT` — the locks
 
-Two structural rules the code relies on, worth knowing before editing:
+Four rules the code depends on:
 
-- All exterior relief is **cut from** the 178 mm envelope, never added to a
-  smaller body, so no detailing can push a part past the build plate.
-- `cleanup()` drops the hairline shells that coincident-surface booleans leave
-  behind (a hazard rib ending on a panel chamfer, for instance) — some with
-  negative volume. It refuses to discard anything larger than debris.
+- All exterior relief is **cut from** the envelope, never added to a smaller
+  body, so no detailing can push a part past the plate.
+- The seam straps and the tier band sit at the full envelope **on purpose**:
+  every split line lands under one, so a joint reads as a bolted strap.
 - `skin_side()` exists because `profile()` insets in Z as well as X and Y, so a
   plain `skin()` carries full-width slabs at the crown and base. Cutting with
   those shaves the ends; clipping them off in Z instead lands a cut plane on
-  the inset profile's end face and detaches them into separate bodies. Use
-  `skin()` only for detail on the crown or the base.
+  the inset profile's end face and detaches them into separate bodies.
+- `cleanup()` drops hairline boolean debris, and `weld()` collapses the ~1e-5 mm
+  slivers that would otherwise leave the exported STL non-watertight even
+  though the solid is manifold. Both refuse to touch real geometry.
 
-The earlier single-piece 178 mm cube version is in git history at the first
-commit on this branch.
+Earlier designs — a one-piece 178 mm cube and a two-part 178 × 178 × 205 mm
+crate — are in git history on this branch.
