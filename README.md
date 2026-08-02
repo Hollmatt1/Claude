@@ -1,20 +1,21 @@
 # Manga Cargo Cube — A1 mini
 
-A **true 224 mm cube** — same on every axis — printed in 12 parts that lock
+A **true 264 mm cube** — same on every axis — printed in 12 parts that lock
 together with no glue, no screws and no supports.
 
 The cube is **solid but for one book pocket**: a single wide slot milled into
-the block, opening on the front face. Six volumes slide in pressed together,
+the block, opening on the front face. Ten volumes slide in pressed together,
 snug on all four sides, standing 3 mm proud so you can grip a spine. No
 dividers, so nothing draws a line across the front. No open bay, no lid to
 lift.
 
 Loot-box styling: a big even soft bevel on every edge and corner, rounded
-panels rather than chamfered ones, a disc emblem plate, corner castings with
-bolt heads, and the **lid line at two-thirds height** — which is where the
+panels rather than chamfered ones, a **bold diagonal band** corner to corner on
+every face, a disc emblem plate, corner castings with bolt heads, and the
+**lid line at two-thirds height** — which is where the
 tier split actually falls, so the structural seam is the styling. Detail runs
 **across** the joints rather than stopping at them, and each split hides under
-a 9 mm strap, so eight octants read as one object.
+a 6 mm strap, so eight octants read as one object.
 
 ![preview](docs/cube_preview.png)
 
@@ -33,8 +34,19 @@ full-width cross-section, and the largest square that fits inside a 180 mm cube
 is only ~191 mm — so **all three axes have to be split**. 2 × 2 × 2 is the
 coarsest split that works: eight 108 mm octants, plus four spline keys.
 
-224 mm gives a standing Viz shonen volume (190.5 mm) a 16 mm floor and a 14 mm
-ceiling, which is what leaves a real frame around the slots on the front face.
+264 mm is set by capacity, not by the book: ten spines pressed together are
+202 mm across, and the pocket needs a solid margin either side wide enough to
+carry the cap's dovetail channels. At 224 mm that margin falls to 11 mm and the
+lock has nowhere to live.
+
+## Why the diagonal is a graphic, not a split
+
+A genuinely diagonal *split* cannot be printed. Wedges cut on the cube's
+vertical diagonals have a 264 × 132 mm footprint, and 264 exceeds the 180 mm
+plate in any orientation. Tilting the tier plane instead buys only about 12°
+of slope before one tier grows past 180 mm, and it would put the cap lock on a
+sloped mating face. So the diagonal is carried by the surface — a raised band
+wide enough to be the thing you read — with the joints demoted to thin straps.
 
 ## How it locks
 
@@ -71,14 +83,14 @@ also pulls a base octant sideways and checks it fouls its key.
 
 | | |
 | --- | --- |
-| Assembled | 224 × 224 × 224 mm, true cube |
-| Parts | 8 octants (148 mm base, 82 mm cap) + 4 spline keys |
-| Capacity | 6 volumes, pressed together in one pocket |
-| Pocket | 122 × 124 × 194 mm — 2 mm slack over 6 spines, books 3 mm proud |
-| Floor / ceiling | 16 / 14 mm |
-| Lid line / tier split | 148 mm, two-thirds height |
+| Assembled | 264 × 264 × 264 mm, true cube |
+| Parts | 8 octants (176 mm base, 94 mm cap) + 4 spline keys |
+| Capacity | 10 volumes, pressed together in one pocket |
+| Pocket | 202 × 124 × 194 mm — 2 mm slack over 10 spines, books 3 mm proud |
+| Floor / ceiling | 34 / 36 mm |
+| Lid line / tier split | 176 mm, two-thirds height |
 | Cap lock | 8 dovetail tenons, 8 mm travel, blind channels, 0.20 mm fit |
-| Material | 6170 cm³ solid across all parts |
+| Material | 10135 cm³ solid across all parts |
 
 ## Printing
 
@@ -89,10 +101,12 @@ and both wide recesses are narrow grooves instead, so nothing bridges more than
 - **Supports:** off · **Layer:** 0.2 mm · **Walls:** 3 · **Infill:** 10–15%
 - **Orientation:** as exported. Base octants sit floor-down, cap octants are
   already flipped crown-down, keys stand on end.
-- **Filament:** roughly **1.3–1.6 kg** for the set, and a long queue of 12
-  prints. A solid cube is mostly infill rather than plastic, so this is well
-  under the 6170 cm³ solid figure — but it is an estimate, so slice it for real
-  numbers. `SIDE` and `N_BOOKS` are the knobs if that is too much.
+- **Filament: roughly 2.0–2.4 kg**, and a long queue of 12 large prints. This
+  is the real cost of ten volumes: capacity set the cube size, and volume goes
+  as the cube of it. A solid cube is mostly infill rather than plastic, so this
+  sits well under the 10135 cm³ solid figure — but it is an estimate, so slice
+  it for real numbers. **`N_BOOKS` is the knob**: dropping to 6 returns the
+  cube to 224 mm and about 1.4 kg.
 
 If the dovetails or keys are tight on your printer, raise `FIT`; if they
 rattle, lower it. 0.20 mm per side is the starting point.
@@ -101,7 +115,9 @@ rattle, lower it. 0.20 mm per side is the starting point.
 
 Everything lives in the `PARAMETERS` block of `src/manga_cube.py`.
 
+- `N_BOOKS` — capacity, and the thing that sets `SIDE`
 - `SIDE` — the cube. Below ~213 mm the book no longer fits standing
+- `DIAG_W` — the diagonal band
 - `N_BOOKS`, `SLOT_*`, `BOOK_*` — the pocket and the media it is cut for
 - `EDGE_CH` / `CORNER_CH`, `PANEL_R`, `EMBLEM_*`, `SEAM_Z` — the loot-box look:
   bevel size, panel corner radius, the disc plate, and the lid line
@@ -127,9 +143,11 @@ Four rules the code depends on:
   welding them to satisfy `is_watertight` turned point-pinches into real holes.
   `mesh_report()` counts boundary edges instead, which is the property that
   actually matters — all 12 parts have zero.
-- The hidden chambers are **gabled along their short axis**. A flat-roofed
-  buried void is 5000 mm² of ceiling that no support could ever be removed
-  from, and only the short span can close to a ridge at 45°.
+- The hidden chambers are **gabled, and split into strips**. A flat-roofed
+  buried void is thousands of mm² of ceiling that no support could ever be
+  removed from; and a 45° gable only closes over twice its own rise, so a
+  chamber deeper than that is divided into strips that can each roof
+  themselves. The upper chamber is short and deep and needs this.
 
 ## Assembly note
 
@@ -137,5 +155,12 @@ Loading is through the pocket only — the cap octants do come off individually
 (slide one forward 8 mm and lift), but you never need to.
 
 Earlier designs — a one-piece 178 mm cube, a two-part 178 × 178 × 205 mm crate,
-a 216 mm open-bay cube, and a six-slot version with dividers — are in git
-history on this branch.
+a 216 mm open-bay cube, a six-slot version with dividers, and a 224 mm
+six-volume cube — are in git history on this branch.
+
+## Two-tone
+
+Printing the four `cap_*` parts and the keys in cream and the four `base_*`
+parts in yellow reproduces the yellow crate from the reference art directly:
+the cap is the top third of the cube, so the split is already in the right
+place. No design change needed.

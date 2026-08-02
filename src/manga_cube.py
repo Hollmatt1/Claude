@@ -43,12 +43,12 @@ from manifold3d import Manifold
 # --------------------------------------------------------------------------
 
 BUILD = 180.0                 # A1 mini plate
-SIDE = 224.0                  # the cube, every axis
+SIDE = 264.0                  # the cube, every axis
 
 # --- shell ---
 WALL = 12.0
-FLOOR = 16.0
-CEIL = 14.0
+FLOOR = 34.0
+CEIL = 36.0
 
 # --- bevels ---
 EDGE_CH = 18.0                # loot-box soft bevel: big and even
@@ -60,7 +60,7 @@ CORNER_CH = 40.0
 BOOK_DEPTH = 127.0
 BOOK_HEIGHT = 190.5
 BOOK_THICK = 20.0
-N_BOOKS = 6                   # they sit pressed together, no dividers
+N_BOOKS = 10                  # pressed together, no dividers
 SLOT_W = N_BOOKS * BOOK_THICK + 2.0
 SLOT_D = 124.0                # 3 mm shallower than the book, so it stands proud
 SLOT_H = BOOK_HEIGHT + 3.5
@@ -70,8 +70,8 @@ SLOT_LEAD = 2.0               # chamfered lead-in at the slot mouth
 # Behind the slot backs, invisible from outside, split by a solid rib at the
 # tier plane so the cap dovetails have material to bite into. Without these the
 # cube is about 8 litres of infill.
-VOID_X = 80.0
-VOID_Y = (-100.0, -34.0)
+VOID_X = 112.0
+VOID_Y = (-118.0, -22.0)
 VOID_RIB = 26.0               # height of the solid rib left at the seam
 VOID_GABLE = 20.0             # 45 deg roof and floor, so a chamber self-supports
 
@@ -86,18 +86,19 @@ RELIEF_VENT = 8.5             # louvers, sunk below the panel floor
 # runs across a joint is what makes eight parts read as one object. The seams
 # themselves get a scribed panel line instead of a wide cover strap.
 POST_L = 30.0                 # corner castings
-SEAM_W = 9.0                  # strap sitting on each split
-SEAM_Z = 148.0                # the tier split, at two thirds height: this is
+SEAM_W = 6.0                  # strap sitting on each split
+SEAM_Z = 176.0                # the tier split, at two thirds height: this is
                               # the lid line, which is what a loot box reads by
-RAIL_H = 26.0                 # rails at the base and crown
+RAIL_H = 30.0                 # rails at the base and crown
 PANEL_R = 22.0                # rounded panel corners, not chamfered ones
 BEVEL_STEP = 2.0
 BOLT_R = 3.4
+DIAG_W = 30.0                 # the diagonal band, corner to corner
 EMBLEM_R = 30.0               # disc plate on the side and back faces
 EMBLEM_HUB = 13.0
 EMBLEM_D = 1.6
-EMBLEM_U = 42.0               # offset clear of the vertical seam strap
-EMBLEM_Z = 86.0
+EMBLEM_U = 52.0               # offset clear of the vertical seam strap
+EMBLEM_Z = 104.0
 
 # --- tier lock: cap octants slide into blind dovetail channels ---
 TRAVEL = 8.0
@@ -105,8 +106,8 @@ DT_D = 6.0
 DT_TOP_W = 4.0
 DT_BOT_W = 8.0
 TEN_L = 18.0
-DT_X = 99.0                   # channels ride the solid side margins
-TEN_AT = (-84.0, -48.0, 40.0, 76.0)   # two per cap octant; none spans a seam
+DT_X = 122.0                   # channels ride the solid side margins
+TEN_AT = (-100.0, -56.0, 48.0, 92.0)   # two per cap octant; none spans a seam
 FIT = 0.20
 
 # --- vertical seam splines ---
@@ -275,6 +276,28 @@ def bolt_heads() -> Manifold:
     return out
 
 
+def diagonal_band() -> Manifold:
+    """One bold diagonal running corner to corner on each of the four faces.
+
+    A genuinely diagonal *split* cannot be printed: wedges cut on the cube's
+    vertical diagonals have a 264 x 132 footprint, and 264 exceeds the plate.
+    Tilting the tier plane instead only buys about 12 degrees before one tier
+    grows past 180 mm, and it would put the cap lock on a sloped mating face.
+    So the diagonal is carried by the surface: a raised band, wide enough to be
+    the thing you read, with the joints demoted to thin straps behind it.
+    """
+    u = HX - POST_L
+    z0, z1 = RAIL_H, SIDE - RAIL_H
+    out = None
+    for axis, sign in ((0, 1), (0, -1), (1, -1), (1, 1)):
+        ends = [_face(axis, sign, uu - DIAG_W / 2, uu + DIAG_W / 2,
+                      zz - DIAG_W / 2, zz + DIAG_W / 2)
+                for uu, zz in ((-u, z0), (u, z1))]
+        band = Manifold.batch_hull(ends)
+        out = band if out is None else out + band
+    return out
+
+
 def _face(axis, sign, u0, u1, z0, z1):
     """A region on one face: `u0`..`u1` across it, `z0`..`z1` up it."""
     if axis == 0:
@@ -330,7 +353,7 @@ def build_assembly() -> Manifold:
     solid = profile()
 
     # step the vertical faces back, sparing only the bolt heads
-    spared = bolt_heads() + seam_ribs()
+    spared = bolt_heads() + seam_ribs() + diagonal_band()
     solid -= skin_side(0.0, RELIEF_FRAME) - spared
 
     # one rounded panel per face: bevel lip, then floor
@@ -376,25 +399,34 @@ def build_assembly() -> Manifold:
     for z0, z1, gable_top in ((FLOOR_Z + 14, sz - VOID_RIB / 2, True),
                               (sz + VOID_RIB / 2, CEIL_Z - 14, False)):
         y0, y1 = VOID_Y
-        ym = (y0 + y1) / 2
-        g = (y1 - y0) / 2 * 1.15      # slope clear of 45, not exactly on it
+        height = z1 - z0
+        # A 45 degree gable can only close over a span of twice its own rise.
+        # The upper chamber is short and deep, so it gets split into strips
+        # narrow enough to roof themselves; one wide chamber would overrun its
+        # own height and leave a flat roof with nothing under it.
+        strips = max(1, int(np.ceil((y1 - y0) / (2 * 0.85 * height))))
+        width = (y1 - y0) / strips
+        g = width / 2 * 1.15
 
-        def full(a, b):
-            return box(-VOID_X, VOID_X, y0, y1, a, b)
+        for i in range(strips):
+            a = y0 + i * width
+            b = a + width
+            ym = (a + b) / 2
 
-        def ridge(a, b):
-            return box(-VOID_X, VOID_X, ym - 0.01, ym + 0.01, a, b)
+            def full(lo, hi, a=a, b=b):
+                return box(-VOID_X, VOID_X, a, b, lo, hi)
 
-        # The roof slopes along the chamber's short axis - across its 66 mm
-        # depth, not its 160 mm width - because only the short span can close
-        # to a ridge at 45 degrees within the height available.
-        if gable_top:
-            cav = full(z0, z1 - g) + Manifold.batch_hull(
-                [full(z1 - g, z1 - g + 0.01), ridge(z1 - 0.01, z1)])
-        else:
-            cav = Manifold.batch_hull(
-                [ridge(z0, z0 + 0.01), full(z0 + g - 0.01, z0 + g)]) + full(z0 + g, z1)
-        solid -= cav
+            def ridge(lo, hi, ym=ym):
+                return box(-VOID_X, VOID_X, ym - 0.01, ym + 0.01, lo, hi)
+
+            if gable_top:
+                cav = full(z0, z1 - g) + Manifold.batch_hull(
+                    [full(z1 - g, z1 - g + 0.01), ridge(z1 - 0.01, z1)])
+            else:
+                cav = Manifold.batch_hull(
+                    [ridge(z0, z0 + 0.01),
+                     full(z0 + g - 0.01, z0 + g)]) + full(z0 + g, z1)
+            solid -= cav
 
     return solid
 
@@ -440,11 +472,12 @@ def seam_keys():
     divider and the back wall for the x=0 seam, the side margins for y=0.
     """
     lo0, lo1 = -HZ + KEY_END, zc(SEAM_Z) - KEY_END
+    band = (SLOT_BACK + VOID_Y[1]) / 2       # solid strip behind the pocket
     return [
-        (0, SLOT_BACK - 11.0, lo0, lo1),   # behind the pocket, ahead of the void
+        (0, band, lo0, lo1),               # behind the pocket, ahead of the void
         (0, -(HY - WALL / 2), lo0, lo1),   # back wall
-        (1, HX - MARGIN / 2 - 6.5, lo0, lo1),    # +X margin
-        (1, -(HX - MARGIN / 2 - 6.5), lo0, lo1),  # -X margin
+        (1, 110.0, lo0, lo1),              # +X margin, clear of the channels
+        (1, -110.0, lo0, lo1),             # -X margin
     ]
 
 

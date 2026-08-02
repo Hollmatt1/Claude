@@ -69,7 +69,7 @@ def main():
 
     fig, axes = plt.subplots(2, 3, figsize=(15, 10.6), dpi=120)
     for ax, (title, ps, elev, azim) in zip(axes.ravel(), views):
-        ax.imshow(R.rasterise(ps, elev, azim, C.to_trimesh, C.SIDE * 0.80,
+        ax.imshow(R.rasterise(ps, elev, azim, C.to_trimesh, C.SIDE * 0.82,
                               px=args.px))
         ax.set_title(title, fontsize=12); ax.axis("off")
     fig.tight_layout()
