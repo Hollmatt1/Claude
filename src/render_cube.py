@@ -12,11 +12,13 @@ KEYC = (0.72, 0.32, 0.22)
 
 
 def books(n=None):
-    """One volume per slot, standing 3 mm proud of the face."""
+    """The stack, pressed together, standing 3 mm proud of the face."""
     out = []
-    for i, cx in enumerate(C.SLOT_X[:n] if n else C.SLOT_X):
+    n = n or C.N_BOOKS
+    for i in range(n):
+        cx = -n * C.BOOK_THICK / 2 + (i + 0.5) * C.BOOK_THICK
         sh = 0.78 + 0.22 * ((i % 3) / 2.0)
-        out.append((C.box(cx - C.BOOK_THICK / 2, cx + C.BOOK_THICK / 2,
+        out.append((C.box(cx - C.BOOK_THICK / 2 + 0.15, cx + C.BOOK_THICK / 2 - 0.15,
                           C.HX - C.SLOT_D, C.HX - C.SLOT_D + C.BOOK_DEPTH,
                           C.FLOOR_Z, C.FLOOR_Z + C.BOOK_HEIGHT),
                     tuple(c * sh for c in AMBER)))

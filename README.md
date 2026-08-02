@@ -3,16 +3,18 @@
 A **true 224 mm cube** — same on every axis — printed in 12 parts that lock
 together with no glue, no screws and no supports.
 
-The cube is **solid but for the book slots**: six book-shaped pockets milled
-into the block, one per volume, each opening on the front face. A volume slides
-in like a book into a slipcase, snug on all four sides, and stands 3 mm proud
-so you can grip the spine. There is no open bay and no lid to lift.
+The cube is **solid but for one book pocket**: a single wide slot milled into
+the block, opening on the front face. Six volumes slide in pressed together,
+snug on all four sides, standing 3 mm proud so you can grip a spine. No
+dividers, so nothing draws a line across the front. No open bay, no lid to
+lift.
 
-Sci-fi cargo crate detailing: corner castings with bolt heads, one octagonal
-machined panel per face with full-face X-bracing, louver vent banks, and
-hazard-striped base and crown rails. Detail runs **across** the joints rather
-than stopping at them, and each split hides under a narrow 7 mm strap, so eight
-octants read as one object rather than a stack of boxes.
+Loot-box styling: a big even soft bevel on every edge and corner, rounded
+panels rather than chamfered ones, a disc emblem plate, corner castings with
+bolt heads, and the **lid line at two-thirds height** — which is where the
+tier split actually falls, so the structural seam is the styling. Detail runs
+**across** the joints rather than stopping at them, and each split hides under
+a 9 mm strap, so eight octants read as one object.
 
 ![preview](docs/cube_preview.png)
 
@@ -59,8 +61,8 @@ also pulls a base octant sideways and checks it fouls its key.
 ## Assembly
 
 1. Butt the four `base_*` octants together on a flat surface.
-2. Drop `key_1`–`key_4` down the vertical seams (three long, one short in the
-   hatch sill). The lower ring is now locked laterally.
+2. Drop `key_1`–`key_4` down the vertical seams. The lower ring is now locked
+   laterally.
 3. For each `cap_*` octant: set it on its quarter 8 mm forward, lower it, slide
    it back until it stops. It is now locked down and the keys beneath are
    captive.
@@ -70,12 +72,13 @@ also pulls a base octant sideways and checks it fouls its key.
 | | |
 | --- | --- |
 | Assembled | 224 × 224 × 224 mm, true cube |
-| Parts | 8 octants at 112 mm + 4 spline keys |
-| Capacity | 6 volumes, one per slot |
-| Slot | 21 × 124 × 194 mm — 1 mm on thickness, book stands 3 mm proud |
+| Parts | 8 octants (148 mm base, 82 mm cap) + 4 spline keys |
+| Capacity | 6 volumes, pressed together in one pocket |
+| Pocket | 122 × 124 × 194 mm — 2 mm slack over 6 spines, books 3 mm proud |
 | Floor / ceiling | 16 / 14 mm |
+| Lid line / tier split | 148 mm, two-thirds height |
 | Cap lock | 8 dovetail tenons, 8 mm travel, blind channels, 0.20 mm fit |
-| Material | 6280 cm³ solid across all parts |
+| Material | 6170 cm³ solid across all parts |
 
 ## Printing
 
@@ -88,8 +91,8 @@ and both wide recesses are narrow grooves instead, so nothing bridges more than
   already flipped crown-down, keys stand on end.
 - **Filament:** roughly **1.3–1.6 kg** for the set, and a long queue of 12
   prints. A solid cube is mostly infill rather than plastic, so this is well
-  under the 6280 cm³ solid figure — but it is an estimate, so slice it for real
-  numbers. `SIDE` and `N_SLOTS` are the knobs if that is too much.
+  under the 6170 cm³ solid figure — but it is an estimate, so slice it for real
+  numbers. `SIDE` and `N_BOOKS` are the knobs if that is too much.
 
 If the dovetails or keys are tight on your printer, raise `FIT`; if they
 rattle, lower it. 0.20 mm per side is the starting point.
@@ -99,20 +102,23 @@ rattle, lower it. 0.20 mm per side is the starting point.
 Everything lives in the `PARAMETERS` block of `src/manga_cube.py`.
 
 - `SIDE` — the cube. Below ~213 mm the book no longer fits standing
-- `N_SLOTS`, `SLOT_*`, `DIV`, `DIV_C`, `BOOK_*` — the slots and their media.
-  `DIV_C` is the wide centre divider the x=0 seam runs down
+- `N_BOOKS`, `SLOT_*`, `BOOK_*` — the pocket and the media it is cut for
+- `EDGE_CH` / `CORNER_CH`, `PANEL_R`, `EMBLEM_*`, `SEAM_Z` — the loot-box look:
+  bevel size, panel corner radius, the disc plate, and the lid line
 - `VOID_*` — the hidden chambers behind the slot backs
 - `RELIEF_FRAME` / `_BEVEL` / `_FIELD` / `_VENT` — the four relief planes.
   `RELIEF_VENT` must stay well clear of `WALL` or the louvers cut through
-- `POST_L`, `STRAP_W`, `BAND_H`, `VENT_N`, `BOLT_R`, `STRIPE_PITCH` — greebling
 - `TRAVEL`, `DT_*`, `KEY_*`, `FIT` — the locks
 
 Four rules the code depends on:
 
 - All exterior relief is **cut from** the envelope, never added to a smaller
   body, so no detailing can push a part past the plate.
-- The seam straps and the tier band sit at the full envelope **on purpose**:
-  every split line lands under one, so a joint reads as a bolted strap.
+- The seam straps sit at the full envelope **on purpose**: every split line
+  lands under one, so a joint reads as a strap rather than a crack. The
+  horizontal one doubles as the loot-box lid line.
+- The emblem is offset sideways because a face-centred disc would be bisected
+  by the vertical seam strap.
 - `skin_side()` exists because `profile()` insets in Z as well as X and Y, so a
   plain `skin()` carries full-width slabs at the crown and base. Cutting with
   those shaves the ends; clipping them off in Z instead lands a cut plane on
@@ -127,8 +133,9 @@ Four rules the code depends on:
 
 ## Assembly note
 
-Loading is through the slots only — the cap octants do come off individually
+Loading is through the pocket only — the cap octants do come off individually
 (slide one forward 8 mm and lift), but you never need to.
 
 Earlier designs — a one-piece 178 mm cube, a two-part 178 × 178 × 205 mm crate,
-and a 216 mm open-bay cube — are in git history on this branch.
+a 216 mm open-bay cube, and a six-slot version with dividers — are in git
+history on this branch.

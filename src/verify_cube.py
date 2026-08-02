@@ -100,25 +100,29 @@ def main() -> int:
     check("no two parts overlap", worst < 1e-6, f"worst {worst:.2f} mm^3")
 
     # ---- media -----------------------------------------------------------
-    # One book-shaped pocket per volume, so check each slot individually.
-    check("one slot per volume", len(C.SLOT_X) == C.N_SLOTS, f"{C.N_SLOTS}")
-    worst_fit = 0.0
-    for cx in C.SLOT_X:
-        vol = C.box(cx - C.BOOK_THICK / 2, cx + C.BOOK_THICK / 2,
-                    C.HX - C.SLOT_D, C.HX - C.SLOT_D + C.BOOK_DEPTH,
-                    C.FLOOR_Z, C.FLOOR_Z + C.BOOK_HEIGHT)
-        worst_fit = max(worst_fit, max(clash(p, vol) for p in parts.values()))
-    check("a volume fits every slot", worst_fit < 1e-6, f"{worst_fit:.2f} mm^3")
-    check("slot is snug on thickness",
-          0.5 <= C.SLOT_W - C.BOOK_THICK <= 2.0,
-          f"{C.SLOT_W - C.BOOK_THICK:.1f} mm total clearance")
-    check("book stands proud enough to grip",
+    # One wide pocket, volumes pressed together with no dividers.
+    stack = C.box(-C.N_BOOKS * C.BOOK_THICK / 2, C.N_BOOKS * C.BOOK_THICK / 2,
+                  C.HX - C.SLOT_D, C.HX - C.SLOT_D + C.BOOK_DEPTH,
+                  C.FLOOR_Z, C.FLOOR_Z + C.BOOK_HEIGHT)
+    worst_fit = max(clash(p, stack) for p in parts.values())
+    check("the full stack fits the pocket", worst_fit < 1e-6,
+          f"{C.N_BOOKS} volumes, {worst_fit:.2f} mm^3 clash")
+    check("pocket is snug across the stack",
+          0.5 <= C.SLOT_W - C.N_BOOKS * C.BOOK_THICK <= 4.0,
+          f"{C.SLOT_W - C.N_BOOKS * C.BOOK_THICK:.1f} mm slack over "
+          f"{C.N_BOOKS} spines")
+    check("books stand proud enough to grip",
           2.0 <= C.BOOK_DEPTH - C.SLOT_D <= 5.0,
           f"{C.BOOK_DEPTH - C.SLOT_D:.1f} mm proud of the face")
     check("spines fully enclosed in height",
           C.FLOOR + C.BOOK_HEIGHT <= C.SIDE - C.CEIL + 1e-6,
           f"book top {C.FLOOR + C.BOOK_HEIGHT:.1f} vs {C.SIDE - C.CEIL:.1f} mm")
-    capacity = C.N_SLOTS
+    check("no dividers in the pocket",
+          solid_frac(None if False else
+                     [p for n, p in parts.items() if n == "base_FR"][0],
+                     [10, 60, C.FLOOR_Z + 90]) < 0.1,
+          "mid-pocket is open")
+    capacity = C.N_BOOKS
 
     # ---- the shell is solid where it should be ---------------------------
     body = None
@@ -128,14 +132,12 @@ def main() -> int:
     for p in list(bases.values()) + list(caps.values()):
         whole = p if whole is None else whole + p
 
-    behind = C.HX - C.RELIEF_VENT - 1.5
-    check("wall intact behind the back louvers",
-          solid_frac(whole, [40, -behind, C.zc(C.SIDE / 2)]) > 0.9)
-    check("solid between adjacent slots",
-          solid_frac(body, [(C.SLOT_X[3] + C.SLOT_X[4]) / 2, 60, -20]) > 0.9,
-          "divider")
-    check("solid behind the slot backs",
+    check("solid beside the pocket",
+          solid_frac(body, [C.HX - C.MARGIN / 2, 60, -20]) > 0.9, "side margin")
+    check("solid behind the pocket back",
           solid_frac(body, [0, C.SLOT_BACK - 7, -20]) > 0.9)
+    check("solid under the pocket floor",
+          solid_frac(body, [0, 60, C.FLOOR_Z - 6]) > 0.9)
 
     # ---- the cap lock ----------------------------------------------------
     # Each cap octant must lock to the body on its own: drop it TRAVEL forward,

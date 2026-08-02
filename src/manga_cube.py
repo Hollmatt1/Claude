@@ -51,8 +51,8 @@ FLOOR = 16.0
 CEIL = 14.0
 
 # --- bevels ---
-EDGE_CH = 12.0
-CORNER_CH = 26.0
+EDGE_CH = 18.0                # loot-box soft bevel: big and even
+CORNER_CH = 40.0
 
 # --- the media ---
 # The cube is solid but for the slots: one book-shaped pocket per volume,
@@ -60,13 +60,11 @@ CORNER_CH = 26.0
 BOOK_DEPTH = 127.0
 BOOK_HEIGHT = 190.5
 BOOK_THICK = 20.0
-N_SLOTS = 6
-SLOT_W = 21.0                 # book + 1 mm
+N_BOOKS = 6                   # they sit pressed together, no dividers
+SLOT_W = N_BOOKS * BOOK_THICK + 2.0
 SLOT_D = 124.0                # 3 mm shallower than the book, so it stands proud
 SLOT_H = BOOK_HEIGHT + 3.5
 SLOT_LEAD = 2.0               # chamfered lead-in at the slot mouth
-DIV = 8.0                     # divider between slots
-DIV_C = 16.0                  # centre divider: the x=0 seam runs down it
 
 # --- hidden lightening chambers ---
 # Behind the slot backs, invisible from outside, split by a solid rib at the
@@ -74,7 +72,7 @@ DIV_C = 16.0                  # centre divider: the x=0 seam runs down it
 # cube is about 8 litres of infill.
 VOID_X = 80.0
 VOID_Y = (-100.0, -34.0)
-VOID_RIB = 24.0               # height of the solid rib left at the seam
+VOID_RIB = 26.0               # height of the solid rib left at the seam
 VOID_GABLE = 20.0             # 45 deg roof and floor, so a chamber self-supports
 
 # --- relief planes, shallowest to deepest ---
@@ -87,20 +85,19 @@ RELIEF_VENT = 8.5             # louvers, sunk below the panel floor
 # One panel per face, spanning both seams, rather than four tiles: detail that
 # runs across a joint is what makes eight parts read as one object. The seams
 # themselves get a scribed panel line instead of a wide cover strap.
-POST_L = 24.0                 # corner castings
-SEAM_W = 7.0                  # narrow strap sitting on each split
-RAIL_H = 22.0                 # rails at the base and crown
-PANEL_CHAMFER = 30.0
-BEVEL_STEP = 1.8
-BRACE_W = 11.0
-VENT_N = 4
-VENT_H = 5.0
-VENT_PITCH = 9.0
+POST_L = 30.0                 # corner castings
+SEAM_W = 9.0                  # strap sitting on each split
+SEAM_Z = 148.0                # the tier split, at two thirds height: this is
+                              # the lid line, which is what a loot box reads by
+RAIL_H = 26.0                 # rails at the base and crown
+PANEL_R = 22.0                # rounded panel corners, not chamfered ones
+BEVEL_STEP = 2.0
 BOLT_R = 3.4
-STRIPE_W = 6.0
-STRIPE_PITCH = 15.0
-PLACARD = (56.0, 18.0)
-PLACARD_D = 1.2
+EMBLEM_R = 30.0               # disc plate on the side and back faces
+EMBLEM_HUB = 13.0
+EMBLEM_D = 1.6
+EMBLEM_U = 42.0               # offset clear of the vertical seam strap
+EMBLEM_Z = 86.0
 
 # --- tier lock: cap octants slide into blind dovetail channels ---
 TRAVEL = 8.0
@@ -122,21 +119,9 @@ HX = HY = HZ = SIDE / 2.0
 BIG = 900.0
 FLOOR_Z = -HZ + FLOOR
 CEIL_Z = FLOOR_Z + SLOT_H
-SLOT_BACK = HX - SLOT_D       # y where the slots stop
-
-
-def slot_centres():
-    """x of each slot, laid out symmetrically about the wide centre divider."""
-    out, c = [], DIV_C / 2 + SLOT_W / 2
-    for _ in range(N_SLOTS // 2):
-        out += [c, -c]
-        c += SLOT_W + DIV
-    return sorted(out)
-
-
-SLOT_X = slot_centres()
-BLOCK = max(SLOT_X) + SLOT_W / 2      # half-width of the slot block
-MARGIN = HX - BLOCK                   # solid margin either side
+SLOT_BACK = HX - SLOT_D       # y where the slot stops
+BLOCK = SLOT_W / 2            # half-width of the pocket
+MARGIN = HX - BLOCK           # solid margin either side
 
 
 def zc(height: float) -> float:
@@ -255,6 +240,41 @@ def mesh_report(mesh: trimesh.Trimesh) -> tuple[int, bool]:
 # seams are simply the areas the recessed panels do not reach.
 # --------------------------------------------------------------------------
 
+def seam_ribs() -> Manifold:
+    """A strap standing on each split, on every face.
+
+    Wide cover straps once chopped every face into four tiles and made the cube
+    read as eight boxes; these are narrow and stand at the envelope, so they
+    cover the butt joint while the panel behind them runs the full face. The
+    horizontal one sits at the lid line.
+
+    A groove will not do the job: the faces are already stepped back further
+    than the groove is deep, so it would cut nothing on the frame and a buried
+    slot inside the panels.
+    """
+    g = box(-SEAM_W / 2, SEAM_W / 2, -BIG, BIG, -BIG, BIG)
+    g += box(-BIG, BIG, -SEAM_W / 2, SEAM_W / 2, -BIG, BIG)
+    g += box(-BIG, BIG, -BIG, BIG, zc(SEAM_Z) - SEAM_W / 2,
+             zc(SEAM_Z) + SEAM_W / 2)
+    return g
+
+
+def bolt_heads() -> Manifold:
+    """Bolt heads on the corner castings, left standing at the envelope."""
+    out = None
+    for axis in (0, 1):
+        for sign in (1, -1):
+            for u in (HX - POST_L / 2, -(HX - POST_L / 2)):
+                for h in (RAIL_H / 2, SEAM_Z / 2, SEAM_Z + 38.0,
+                          SIDE - RAIL_H / 2):
+                    c = Manifold.cylinder(60.0, BOLT_R, BOLT_R, 24, True)
+                    c = (c.rotate([0, 90, 0]).translate([sign * HX, u, zc(h)])
+                         if axis == 0 else
+                         c.rotate([90, 0, 0]).translate([u, sign * HY, zc(h)]))
+                    out = c if out is None else out + c
+    return out
+
+
 def _face(axis, sign, u0, u1, z0, z1):
     """A region on one face: `u0`..`u1` across it, `z0`..`z1` up it."""
     if axis == 0:
@@ -264,108 +284,42 @@ def _face(axis, sign, u0, u1, z0, z1):
                zc(z0), zc(z1))
 
 
-def _diamond(axis, z_mid, reach):
-    """|u| + |z - z_mid| <= reach, in the plane of the face."""
-    s = reach * np.sqrt(2.0)
-    d = (Manifold.cube([BIG, s, s], True).rotate([45, 0, 0]) if axis == 0
-         else Manifold.cube([s, BIG, s], True).rotate([0, 45, 0]))
-    return d.translate([0, 0, z_mid])
+def rounded(axis, sign, u0, u1, z0, z1, r, grow=0.0):
+    """A rounded-corner panel region on one face.
 
-
-def panel(axis, sign, u0, u1, z0, z1, grow=0.0):
-    """An octagonal panel region: a rectangle with its corners cut back."""
-    a0, a1 = u0 - grow, u1 + grow
-    half = (a1 - a0) / 2
-    b = (z1 - z0) / 2 + grow
-    rect = _face(axis, sign, a0, a1, z0 - grow, z1 + grow)
-    dia = _diamond(axis, zc((z0 + z1) / 2), half + b - PANEL_CHAMFER)
-    off = (a0 + a1) / 2
-    dia = dia.translate([0, off, 0] if axis == 0 else [off, 0, 0])
-    return rect ^ dia
-
-
-def seam_ribs() -> Manifold:
-    """A narrow strap standing on each split, on every face.
-
-    The joints used to hide under 30 mm cover straps, which chopped every face
-    into four tiles and made the cube read as eight boxes. These are 7 mm and
-    stand at the envelope, so they cover the butt joint while the panel, its
-    X-brace and its louvers still run the full width of the face behind them.
-
-    A groove will not do the job: the faces are already stepped back further
-    than the groove is deep, so it would cut nothing on the frame and a buried
-    slot inside the panels.
+    Loot boxes use radiused panels, not chamfered ones - swapping the octagon
+    for a stadium shape is most of what softens the crate into a loot box.
     """
-    g = box(-SEAM_W / 2, SEAM_W / 2, -BIG, BIG, -BIG, BIG)
-    g += box(-BIG, BIG, -SEAM_W / 2, SEAM_W / 2, -BIG, BIG)
-    g += box(-BIG, BIG, -BIG, BIG, -SEAM_W / 2, SEAM_W / 2)
-    return g
-
-
-def bolt_heads() -> Manifold:
-    """Bolt heads down the corner castings, left standing at the envelope."""
-    out = None
-    for axis in (0, 1):
-        for sign in (1, -1):
-            for u in (HX - POST_L / 2, -(HX - POST_L / 2)):
-                for h in (36.0, 96.0, 128.0, 188.0):
-                    c = Manifold.cylinder(60.0, BOLT_R, BOLT_R, 24, True)
-                    c = (c.rotate([0, 90, 0]).translate([sign * HX, u, zc(h)])
-                         if axis == 0 else
-                         c.rotate([90, 0, 0]).translate([u, sign * HY, zc(h)]))
-                    out = c if out is None else out + c
-    return out
+    a0, a1, b0, b1 = u0 - grow, u1 + grow, z0 - grow, z1 + grow
+    cyls = []
+    for uu in (a0 + r, a1 - r):
+        for zz in (b0 + r, b1 - r):
+            c = Manifold.cylinder(BIG, r, r, 48, True)
+            c = (c.rotate([0, 90, 0]).translate([0, uu, zc(zz)]) if axis == 0
+                 else c.rotate([90, 0, 0]).translate([uu, 0, zc(zz)]))
+            cyls.append(c)
+    return Manifold.batch_hull(cyls) ^ _face(axis, sign, a0, a1, b0, b1)
 
 
 def face_panel(axis, sign, grow=0.0):
-    """The single big octagonal panel filling one face."""
+    """The single rounded panel filling one face."""
     u = HX - POST_L
-    return panel(axis, sign, -u, u, RAIL_H, SIDE - RAIL_H, grow=grow)
+    return rounded(axis, sign, -u, u, RAIL_H, SIDE - RAIL_H, PANEL_R, grow)
 
 
-def brace(axis, sign):
-    """A full-face X, corner to corner. It crosses both seams, which is the
-    point: continuous detail is what ties the eight octants together."""
-    u = HX - POST_L
-    z0, z1 = RAIL_H, SIDE - RAIL_H
-    pan = face_panel(axis, sign)
-    out = None
-    for (ua, za), (ub, zb) in (((-u, z0), (u, z1)), ((-u, z1), (u, z0))):
-        ends = [_face(axis, sign, uu - BRACE_W / 2, uu + BRACE_W / 2,
-                      zz - BRACE_W / 2, zz + BRACE_W / 2)
-                for uu, zz in ((ua, za), (ub, zb))]
-        rib = Manifold.batch_hull(ends) ^ pan
-        out = rib if out is None else out + rib
-    return out
+def disc(axis, sign, r):
+    """A disc on one face, offset sideways so the seam strap does not bisect it."""
+    c = Manifold.cylinder(BIG, r, r, 64, True)
+    c = (c.rotate([0, 90, 0]).translate([0, EMBLEM_U, zc(EMBLEM_Z)])
+         if axis == 0 else
+         c.rotate([90, 0, 0]).translate([EMBLEM_U, 0, zc(EMBLEM_Z)]))
+    return c ^ _face(axis, sign, -BIG, BIG, -BIG, BIG)
 
 
-def louvers(axis, sign):
-    """A single bank spanning the whole panel, crossing the vertical seam."""
-    u = HX - POST_L - 16
-    out = None
-    base = SIDE / 2 - (VENT_N * VENT_PITCH) / 2
-    for i in range(VENT_N):
-        zv = base + i * VENT_PITCH
-        sl = _face(axis, sign, -u, u, zv, zv + VENT_H) ^ face_panel(axis, sign)
-        out = sl if out is None else out + sl
-    return out
-
-
-def hazard_band():
-    """45 degree striping cut into the base and crown rails."""
-    out = None
-    for axis, sign in itertools.product((0, 1), (1, -1)):
-        for z0, z1 in ((4.0, RAIL_H - 4.0), (SIDE - RAIL_H + 4.0, SIDE - 4.0)):
-            h = z1 - z0
-            u = -HX - h
-            while u < HX + h:
-                ends = [_face(axis, sign, uu - STRIPE_W / 2, uu + STRIPE_W / 2,
-                              zz - STRIPE_W / 2, zz + STRIPE_W / 2)
-                        for uu, zz in ((u, z0), (u + h, z1))]
-                rib = Manifold.batch_hull(ends)
-                out = rib if out is None else out + rib
-                u += STRIPE_PITCH
-    return out
+def emblem(axis, sign):
+    """A recessed disc plate with a raised hub, centred on the face."""
+    ring = disc(axis, sign, EMBLEM_R) - disc(axis, sign, EMBLEM_HUB)
+    return ring ^ skin_side(RELIEF_FIELD, RELIEF_FIELD + EMBLEM_D)
 
 
 # --------------------------------------------------------------------------
@@ -379,35 +333,20 @@ def build_assembly() -> Manifold:
     spared = bolt_heads() + seam_ribs()
     solid -= skin_side(0.0, RELIEF_FRAME) - spared
 
-    # one panel per face: bevel lip, then floor, with the X standing proud
-    # no panel on the front: it is almost all slot, and the slot walls would
-    # land tangent to the panel steps, pinching the mesh
+    # one rounded panel per face: bevel lip, then floor
     faces = ((0, 1), (0, -1), (1, -1))
-    bevels = fields = braces = vents = None
+    bevels = fields = None
     for axis, sign in faces:
         b = face_panel(axis, sign, grow=BEVEL_STEP)
         f = face_panel(axis, sign)
         bevels = b if bevels is None else bevels + b
         fields = f if fields is None else fields + f
-        if axis == 0:                       # X on the sides
-            r = brace(axis, sign)
-            braces = r if braces is None else braces + r
-        elif sign < 0:                      # louvers on the back
-            v = louvers(axis, sign)
-            vents = v if vents is None else vents + v
+    solid -= (skin_side(RELIEF_FRAME, RELIEF_BEVEL) ^ bevels) - spared
+    solid -= (skin_side(RELIEF_BEVEL, RELIEF_FIELD) ^ fields) - spared
 
-    solid -= (skin_side(RELIEF_FRAME, RELIEF_BEVEL) ^ bevels) - braces - spared
-    solid -= (skin_side(RELIEF_BEVEL, RELIEF_FIELD) ^ fields) - braces - spared
-    solid -= (skin_side(RELIEF_FIELD, RELIEF_VENT) ^ vents) - spared
-
-    # striping in the rails, and a placard on the back
-    rails = (box(-BIG, BIG, -BIG, BIG, -HZ, -HZ + RAIL_H)
-             + box(-BIG, BIG, -BIG, BIG, HZ - RAIL_H, HZ))
-    solid -= (skin_side(RELIEF_FRAME, RELIEF_FIELD) ^ rails
-              - hazard_band() - spared)
-    solid -= (box(-PLACARD[0] / 2, PLACARD[0] / 2, -BIG, -(HY - 8),
-                  zc(SIDE / 2 - PLACARD[1] / 2), zc(SIDE / 2 + PLACARD[1] / 2))
-              ^ skin_side(RELIEF_FIELD, RELIEF_FIELD + PLACARD_D))
+    # emblem plate on the sides and back
+    for axis, sign in faces:
+        solid -= emblem(axis, sign) - spared
 
     # crown grooves, narrow enough to bridge when a cap octant prints crown-down
     crown = (box(-66, 66, -66, 66, zc(SIDE - 6), BIG)
@@ -416,28 +355,26 @@ def build_assembly() -> Manifold:
         crown += box(-54, 54, y - 4, y + 4, zc(SIDE - 6), BIG)
     solid -= crown ^ skin(0.0, 2.5)
 
-    # --- the book slots: the only voids that show ---
-    # Each gets a lead-in chamfer at the mouth, so a volume starts into a tight
-    # slot without catching, and so the mouth is not a sharp three-plane corner
-    # for the boolean to pinch on.
-    for cx in SLOT_X:
-        slot = box(cx - SLOT_W / 2, cx + SLOT_W / 2,
-                   SLOT_BACK, HX - SLOT_LEAD, FLOOR_Z, CEIL_Z)
-        slot += Manifold.batch_hull([
-            box(cx - SLOT_W / 2, cx + SLOT_W / 2, HX - SLOT_LEAD,
-                HX - SLOT_LEAD + 0.01, FLOOR_Z, CEIL_Z),
-            box(cx - SLOT_W / 2 - SLOT_LEAD, cx + SLOT_W / 2 + SLOT_LEAD,
-                HX + 1 - 0.01, HX + 1,
-                FLOOR_Z - SLOT_LEAD, CEIL_Z + SLOT_LEAD),
-        ])
-        solid -= slot
+    # --- the book pocket: one wide slot, volumes pressed together ---
+    # No dividers: the books are their own spacers, and a divider would put a
+    # line on the front face for every volume.
+    slot = box(-SLOT_W / 2, SLOT_W / 2, SLOT_BACK, HX - SLOT_LEAD,
+               FLOOR_Z, CEIL_Z)
+    slot += Manifold.batch_hull([
+        box(-SLOT_W / 2, SLOT_W / 2, HX - SLOT_LEAD, HX - SLOT_LEAD + 0.01,
+            FLOOR_Z, CEIL_Z),
+        box(-SLOT_W / 2 - SLOT_LEAD, SLOT_W / 2 + SLOT_LEAD,
+            HX + 1 - 0.01, HX + 1, FLOOR_Z - SLOT_LEAD, CEIL_Z + SLOT_LEAD),
+    ])
+    solid -= slot
 
     # --- hidden chambers behind the slots, with a solid rib at the seam ---
     # Gabled top and bottom: a flat-roofed chamber is 5000 mm^2 of ceiling with
     # nothing under it, and it is buried, so support could never be removed.
     # A 45 degree roof prints itself, in either part's orientation.
-    for z0, z1, gable_top in ((FLOOR_Z + 14, -VOID_RIB / 2, True),
-                              (VOID_RIB / 2, CEIL_Z - 14, False)):
+    sz = zc(SEAM_Z)
+    for z0, z1, gable_top in ((FLOOR_Z + 14, sz - VOID_RIB / 2, True),
+                              (sz + VOID_RIB / 2, CEIL_Z - 14, False)):
         y0, y1 = VOID_Y
         ym = (y0 + y1) / 2
         g = (y1 - y0) / 2 * 1.15      # slope clear of 45, not exactly on it
@@ -502,9 +439,9 @@ def seam_keys():
     Each must sit in material that is solid over the whole run: the centre
     divider and the back wall for the x=0 seam, the side margins for y=0.
     """
-    lo0, lo1 = -HZ + KEY_END, -KEY_END
+    lo0, lo1 = -HZ + KEY_END, zc(SEAM_Z) - KEY_END
     return [
-        (0, 40.0, lo0, lo1),          # centre divider, in front of the slots
+        (0, SLOT_BACK - 11.0, lo0, lo1),   # behind the pocket, ahead of the void
         (0, -(HY - WALL / 2), lo0, lo1),   # back wall
         (1, HX - MARGIN / 2 - 6.5, lo0, lo1),    # +X margin
         (1, -(HX - MARGIN / 2 - 6.5), lo0, lo1),  # -X margin
@@ -521,14 +458,16 @@ def split_parts() -> dict[str, Manifold]:
         x = sx * DT_X
         for c in TEN_AT:
             ch = dovetail_y(x, c - TEN_L / 2 - 0.4, c + TRAVEL + TEN_L / 2 + 0.4,
-                            DT_TOP_W + 2 * FIT, DT_BOT_W + 2 * FIT, -DT_D, 0.01)
+                            DT_TOP_W + 2 * FIT, DT_BOT_W + 2 * FIT,
+                            zc(SEAM_Z) - DT_D, zc(SEAM_Z) + 0.01)
             po = box(x - DT_BOT_W / 2 - FIT, x + DT_BOT_W / 2 + FIT,
                      c + TRAVEL - TEN_L / 2 - 0.4, c + TRAVEL + TEN_L / 2 + 0.4,
-                     -DT_D, 0.01)
+                     zc(SEAM_Z) - DT_D, zc(SEAM_Z) + 0.01)
             t = dovetail_y(x, c - TEN_L / 2, c + TEN_L / 2,
-                           DT_TOP_W, DT_BOT_W, -DT_D, 0.0)
+                           DT_TOP_W, DT_BOT_W, zc(SEAM_Z) - DT_D, zc(SEAM_Z))
             t += box(x - DT_TOP_W / 2, x + DT_TOP_W / 2,
-                     c - TEN_L / 2, c + TEN_L / 2, -0.5, 1.5)
+                     c - TEN_L / 2, c + TEN_L / 2,
+                     zc(SEAM_Z) - 0.5, zc(SEAM_Z) + 1.5)
             channels = ch if channels is None else channels + ch
             pockets = po if pockets is None else pockets + po
             tenons = t if tenons is None else tenons + t
@@ -541,8 +480,9 @@ def split_parts() -> dict[str, Manifold]:
                    KEY_WIDE + 2 * FIT, KEY_D + FIT)
         grooves = g if grooves is None else grooves + g
 
-    lower = solid ^ box(-BIG, BIG, -BIG, BIG, -BIG, 0.0)
-    upper = solid ^ box(-BIG, BIG, -BIG, BIG, 0.0, BIG)
+    sz = zc(SEAM_Z)
+    lower = solid ^ box(-BIG, BIG, -BIG, BIG, -BIG, sz)
+    upper = solid ^ box(-BIG, BIG, -BIG, BIG, sz, BIG)
     lower -= body_cut + grooves
     upper += tenons
 
