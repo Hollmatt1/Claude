@@ -11,14 +11,13 @@ AMBER = (0.86, 0.52, 0.16)
 KEYC = (0.72, 0.32, 0.22)
 
 
-def books(n=6):
-    w = n * C.BOOK_THICK
+def books(n=None):
+    """One volume per slot, standing 3 mm proud of the face."""
     out = []
-    for i in range(n):
-        x0 = -w / 2 + i * C.BOOK_THICK
-        sh = 0.80 + 0.20 * ((i % 3) / 2.0)
-        out.append((C.box(x0 + 0.8, x0 + C.BOOK_THICK - 0.8,
-                          -C.BOOK_DEPTH / 2, C.BOOK_DEPTH / 2,
+    for i, cx in enumerate(C.SLOT_X[:n] if n else C.SLOT_X):
+        sh = 0.78 + 0.22 * ((i % 3) / 2.0)
+        out.append((C.box(cx - C.BOOK_THICK / 2, cx + C.BOOK_THICK / 2,
+                          C.HX - C.SLOT_D, C.HX - C.SLOT_D + C.BOOK_DEPTH,
                           C.FLOOR_Z, C.FLOOR_Z + C.BOOK_HEIGHT),
                     tuple(c * sh for c in AMBER)))
     return out
@@ -60,8 +59,7 @@ def main():
         ("assembled", solidc, 22, 58),
         ("front", solidc, 8, 90),
         ("parts, by colour", whole, 22, 58),
-        ("loaded, 6 volumes", [(p, STEEL) for n, p in parts.items()
-                               if n.startswith("base")] + books(), 24, 58),
+        ("loaded", [(p, STEEL) for p in parts.values()] + books(), 22, 58),
         ("exploded", exploded, 20, 58),
         ("section", [(p - half, shade(n)) for n, p in parts.items()]
          + [(b - half, c) for b, c in books()], 6, 84),
@@ -69,7 +67,7 @@ def main():
 
     fig, axes = plt.subplots(2, 3, figsize=(15, 10.6), dpi=120)
     for ax, (title, ps, elev, azim) in zip(axes.ravel(), views):
-        ax.imshow(R.rasterise(ps, elev, azim, C.to_trimesh, C.SIDE * 0.78,
+        ax.imshow(R.rasterise(ps, elev, azim, C.to_trimesh, C.SIDE * 0.80,
                               px=args.px))
         ax.set_title(title, fontsize=12); ax.axis("off")
     fig.tight_layout()

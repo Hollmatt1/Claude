@@ -62,25 +62,24 @@ def main() -> int:
 
     # ---- every part is printable and sane -------------------------------
     for name, part in parts.items():
-        mesh = C.to_trimesh(part)
         bb = part.bounding_box()
         size = np.array(bb[3:]) - np.array(bb[:3])
-        ok = bool(np.all(size <= C.BUILD + 1e-6))
-        if not (mesh.is_watertight and len(part.decompose()) == 1 and ok):
-            check(f"{name}: watertight / single / fits", False,
-                  f"wt={mesh.is_watertight} bodies={len(part.decompose())} "
-                  f"{size[0]:.0f}x{size[1]:.0f}x{size[2]:.0f}")
-        for label, p in (("as printed", C.print_ready(name, part)),):
-            a = overhang_area(p)
-            if a >= 1.0:
-                check(f"{name}: no overhang needing support ({label})", False,
-                      f"{a:.0f} mm^2")
-    check("all parts watertight, single-body, on-plate", not FAILURES)
-    check("every part welds to a watertight export",
-          all(C.weld(C.to_trimesh(C.print_ready(n, p))).is_watertight
-              for n, p in parts.items()))
+        check(f"{name}: single body and on the plate",
+              len(part.decompose()) == 1 and bool(np.all(size <= C.BUILD + 1e-6)),
+              f"{size[0]:.0f} x {size[1]:.0f} x {size[2]:.0f} mm")
+
+    holes = {n: C.mesh_report(C.to_trimesh(C.print_ready(n, p)))
+             for n, p in parts.items()}
+    check("every part is a closed surface (no boundary edges)",
+          all(b == 0 for b, _ in holes.values()),
+          str({n: b for n, (b, _) in holes.items() if b}))
+    check("every part has consistent winding",
+          all(w for _, w in holes.values()))
+
+    over = {n: overhang_area(C.print_ready(n, p)) for n, p in parts.items()}
     check("no part needs support",
-          all(overhang_area(C.print_ready(n, p)) < 1.0 for n, p in parts.items()))
+          all(a < 1.0 for a in over.values()),
+          str({n: round(a) for n, a in over.items() if a >= 1.0}))
 
     # ---- it is a true cube ----------------------------------------------
     whole = None
@@ -101,34 +100,42 @@ def main() -> int:
     check("no two parts overlap", worst < 1e-6, f"worst {worst:.2f} mm^3")
 
     # ---- media -----------------------------------------------------------
-    capacity = int(C.BAY // C.BOOK_THICK)
-    stack = C.box(-capacity * C.BOOK_THICK / 2, capacity * C.BOOK_THICK / 2,
-                  -C.BOOK_DEPTH / 2, C.BOOK_DEPTH / 2,
-                  C.FLOOR_Z, C.FLOOR_Z + C.BOOK_HEIGHT)
-    check("holds at least 5 volumes", capacity >= 5, f"{capacity} volumes")
-    check("stack clears every part",
-          all(clash(p, stack) < 1e-6 for p in parts.values()))
-    check("spines fully enclosed",
+    # One book-shaped pocket per volume, so check each slot individually.
+    check("one slot per volume", len(C.SLOT_X) == C.N_SLOTS, f"{C.N_SLOTS}")
+    worst_fit = 0.0
+    for cx in C.SLOT_X:
+        vol = C.box(cx - C.BOOK_THICK / 2, cx + C.BOOK_THICK / 2,
+                    C.HX - C.SLOT_D, C.HX - C.SLOT_D + C.BOOK_DEPTH,
+                    C.FLOOR_Z, C.FLOOR_Z + C.BOOK_HEIGHT)
+        worst_fit = max(worst_fit, max(clash(p, vol) for p in parts.values()))
+    check("a volume fits every slot", worst_fit < 1e-6, f"{worst_fit:.2f} mm^3")
+    check("slot is snug on thickness",
+          0.5 <= C.SLOT_W - C.BOOK_THICK <= 2.0,
+          f"{C.SLOT_W - C.BOOK_THICK:.1f} mm total clearance")
+    check("book stands proud enough to grip",
+          2.0 <= C.BOOK_DEPTH - C.SLOT_D <= 5.0,
+          f"{C.BOOK_DEPTH - C.SLOT_D:.1f} mm proud of the face")
+    check("spines fully enclosed in height",
           C.FLOOR + C.BOOK_HEIGHT <= C.SIDE - C.CEIL + 1e-6,
-          f"book top {C.FLOOR + C.BOOK_HEIGHT:.1f} vs ceiling "
-          f"{C.SIDE - C.CEIL:.1f} mm")
+          f"book top {C.FLOOR + C.BOOK_HEIGHT:.1f} vs {C.SIDE - C.CEIL:.1f} mm")
+    capacity = C.N_SLOTS
 
-    # ---- openings and wall integrity -------------------------------------
+    # ---- the shell is solid where it should be ---------------------------
     body = None
     for p in bases.values():
         body = p if body is None else body + p
+    whole = None
+    for p in list(bases.values()) + list(caps.values()):
+        whole = p if whole is None else whole + p
+
     behind = C.HX - C.RELIEF_VENT - 1.5
-    check("front hatch is open",
-          solid_frac(body, [0, C.HX - C.WALL / 2, C.zc(70)]) < 0.1)
-    check("hatch sill is solid below",
-          solid_frac(body, [40, C.HX - C.RELIEF_FIELD - 2, C.zc(14)]) > 0.9)
-    # Louvers live in the upper panels, so probe the whole cube, not the base.
-    for sign, label in ((1, "+X"), (-1, "-X")):
-        check(f"wall intact behind {label} louvers",
-              solid_frac(whole, [sign * behind, 40, C.zc(143)]) > 0.9,
-              f"{C.WALL - C.RELIEF_VENT:.1f} mm of wall left")
-    check("wall intact behind -Y louvers",
-          solid_frac(whole, [40, -behind, C.zc(143)]) > 0.9)
+    check("wall intact behind the back louvers",
+          solid_frac(whole, [40, -behind, C.zc(C.SIDE / 2)]) > 0.9)
+    check("solid between adjacent slots",
+          solid_frac(body, [(C.SLOT_X[3] + C.SLOT_X[4]) / 2, 60, -20]) > 0.9,
+          "divider")
+    check("solid behind the slot backs",
+          solid_frac(body, [0, C.SLOT_BACK - 7, -20]) > 0.9)
 
     # ---- the cap lock ----------------------------------------------------
     # Each cap octant must lock to the body on its own: drop it TRAVEL forward,

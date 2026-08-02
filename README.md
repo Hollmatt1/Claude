@@ -1,9 +1,18 @@
 # Manga Cargo Cube — A1 mini
 
-A **true 216 mm cube** — same on every axis — printed in 12 parts that lock
-together with no glue, no screws and no supports. Sci-fi cargo crate detailing:
-corner castings, bolted seam straps, octagonal machined panels with X-bracing,
-louver vent banks, hazard-striped rails and a framed front hatch.
+A **true 224 mm cube** — same on every axis — printed in 12 parts that lock
+together with no glue, no screws and no supports.
+
+The cube is **solid but for the book slots**: six book-shaped pockets milled
+into the block, one per volume, each opening on the front face. A volume slides
+in like a book into a slipcase, snug on all four sides, and stands 3 mm proud
+so you can grip the spine. There is no open bay and no lid to lift.
+
+Sci-fi cargo crate detailing: corner castings with bolt heads, one octagonal
+machined panel per face with full-face X-bracing, louver vent banks, and
+hazard-striped base and crown rails. Detail runs **across** the joints rather
+than stopping at them, and each split hides under a narrow 7 mm strap, so eight
+octants read as one object rather than a stack of boxes.
 
 ![preview](docs/cube_preview.png)
 
@@ -22,8 +31,8 @@ full-width cross-section, and the largest square that fits inside a 180 mm cube
 is only ~191 mm — so **all three axes have to be split**. 2 × 2 × 2 is the
 coarsest split that works: eight 108 mm octants, plus four spline keys.
 
-216 mm is the smallest cube that still swallows a standing Viz shonen volume
-(190.5 mm) behind a 12 mm floor and a 10 mm ceiling, with 3.5 mm to spare.
+224 mm gives a standing Viz shonen volume (190.5 mm) a 16 mm floor and a 14 mm
+ceiling, which is what leaves a real frame around the slots on the front face.
 
 ## How it locks
 
@@ -56,20 +65,17 @@ also pulls a base octant sideways and checks it fouls its key.
    it back until it stops. It is now locked down and the keys beneath are
    captive.
 
-Loading works either way — through the front hatch, or by sliding one cap
-octant forward and lifting it off.
-
 ## Specification
 
 | | |
 | --- | --- |
-| Assembled | 216 × 216 × 216 mm, true cube |
-| Parts | 8 octants at 108 mm + 4 spline keys |
-| Capacity | 6 volumes at 20 mm |
-| Walls / floor / ceiling | 12 / 12 / 10 mm |
-| Front hatch | 126 × 124 mm, self-supporting head |
+| Assembled | 224 × 224 × 224 mm, true cube |
+| Parts | 8 octants at 112 mm + 4 spline keys |
+| Capacity | 6 volumes, one per slot |
+| Slot | 21 × 124 × 194 mm — 1 mm on thickness, book stands 3 mm proud |
+| Floor / ceiling | 16 / 14 mm |
 | Cap lock | 8 dovetail tenons, 8 mm travel, blind channels, 0.20 mm fit |
-| Material | 2197 cm³ solid across all parts |
+| Material | 6280 cm³ solid across all parts |
 
 ## Printing
 
@@ -80,9 +86,10 @@ and both wide recesses are narrow grooves instead, so nothing bridges more than
 - **Supports:** off · **Layer:** 0.2 mm · **Walls:** 3 · **Infill:** 10–15%
 - **Orientation:** as exported. Base octants sit floor-down, cap octants are
   already flipped crown-down, keys stand on end.
-- **Filament:** roughly 1.0–1.3 kg for the set. A 12 mm wall prints mostly
-  hollow, so this is well under the 2197 cm³ solid figure — but it is an
-  estimate, so slice it for real numbers. Expect a long queue of 12 prints.
+- **Filament:** roughly **1.3–1.6 kg** for the set, and a long queue of 12
+  prints. A solid cube is mostly infill rather than plastic, so this is well
+  under the 6280 cm³ solid figure — but it is an estimate, so slice it for real
+  numbers. `SIDE` and `N_SLOTS` are the knobs if that is too much.
 
 If the dovetails or keys are tight on your printer, raise `FIT`; if they
 rattle, lower it. 0.20 mm per side is the starting point.
@@ -92,7 +99,9 @@ rattle, lower it. 0.20 mm per side is the starting point.
 Everything lives in the `PARAMETERS` block of `src/manga_cube.py`.
 
 - `SIDE` — the cube. Below ~213 mm the book no longer fits standing
-- `BAY`, `BOOK_*` — the bay and the media it is cut for
+- `N_SLOTS`, `SLOT_*`, `DIV`, `DIV_C`, `BOOK_*` — the slots and their media.
+  `DIV_C` is the wide centre divider the x=0 seam runs down
+- `VOID_*` — the hidden chambers behind the slot backs
 - `RELIEF_FRAME` / `_BEVEL` / `_FIELD` / `_VENT` — the four relief planes.
   `RELIEF_VENT` must stay well clear of `WALL` or the louvers cut through
 - `POST_L`, `STRAP_W`, `BAND_H`, `VENT_N`, `BOLT_R`, `STRIPE_PITCH` — greebling
@@ -108,9 +117,18 @@ Four rules the code depends on:
   plain `skin()` carries full-width slabs at the crown and base. Cutting with
   those shaves the ends; clipping them off in Z instead lands a cut plane on
   the inset profile's end face and detaches them into separate bodies.
-- `cleanup()` drops hairline boolean debris, and `weld()` collapses the ~1e-5 mm
-  slivers that would otherwise leave the exported STL non-watertight even
-  though the solid is manifold. Both refuse to touch real geometry.
+- `cleanup()` drops hairline boolean debris. Meshes are exported **raw**:
+  welding them to satisfy `is_watertight` turned point-pinches into real holes.
+  `mesh_report()` counts boundary edges instead, which is the property that
+  actually matters — all 12 parts have zero.
+- The hidden chambers are **gabled along their short axis**. A flat-roofed
+  buried void is 5000 mm² of ceiling that no support could ever be removed
+  from, and only the short span can close to a ridge at 45°.
 
-Earlier designs — a one-piece 178 mm cube and a two-part 178 × 178 × 205 mm
-crate — are in git history on this branch.
+## Assembly note
+
+Loading is through the slots only — the cap octants do come off individually
+(slide one forward 8 mm and lift), but you never need to.
+
+Earlier designs — a one-piece 178 mm cube, a two-part 178 × 178 × 205 mm crate,
+and a 216 mm open-bay cube — are in git history on this branch.
