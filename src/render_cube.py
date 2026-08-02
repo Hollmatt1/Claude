@@ -6,9 +6,10 @@ import numpy as np
 import manga_cube as C
 import raster as R
 
-STEEL = (0.44, 0.48, 0.54)
-AMBER = (0.86, 0.52, 0.16)
-KEYC = (0.72, 0.32, 0.22)
+YELLOW = (0.86, 0.66, 0.16)   # the crate body
+CREAM = (0.88, 0.88, 0.85)    # cap band and corner posts
+AMBER = (0.72, 0.42, 0.14)    # the manga
+KEYC = (0.55, 0.55, 0.52)
 
 
 def books(n=None):
@@ -35,33 +36,35 @@ def main():
     import matplotlib.pyplot as plt
 
     parts = C.split_parts()
-    tint = {"base_FR": 0.00, "base_FL": 0.06, "base_BR": 0.06, "base_BL": 0.00,
-            "cap_FR": 0.10, "cap_FL": 0.04, "cap_BR": 0.04, "cap_BL": 0.10}
-
     def shade(name):
+        """As it would print: yellow body, cream cap band and corner posts."""
         if name.startswith("key"):
             return KEYC
-        t = tint.get(name, 0.0)
-        return tuple(min(1.0, c + t) for c in STEEL)
+        if name.startswith("cap") or name.startswith("post"):
+            return CREAM
+        return YELLOW
 
     whole = [(p, shade(n)) for n, p in parts.items()]
-    solidc = [(p, STEEL) for n, p in parts.items() if not n.startswith("key")]
+    solidc = [(p, shade(n)) for n, p in parts.items() if not n.startswith("key")]
 
     half = C.box(-C.BIG, C.BIG, -C.BIG, 0, -C.BIG, C.BIG)
     exploded = []
     for n, p in parts.items():
         dx = 26 if "R" in n[-2:] else -26
         dy = 26 if "F" in n else -26
-        dz = 40 if n.startswith("cap") else 0
+        dz = 46 if n.startswith("cap") else 0
+        if n.startswith("post"):
+            dz = 22
+            dx, dy = dx * 1.9, dy * 1.9
         if n.startswith("key"):
-            dx, dy, dz = 0, 0, -46
+            dx, dy, dz = 0, 0, -52
         exploded.append((p.translate([dx, dy, dz]), shade(n)))
 
     views = [
         ("assembled", solidc, 22, 58),
         ("front", solidc, 8, 90),
-        ("parts, by colour", whole, 22, 58),
-        ("loaded", [(p, STEEL) for p in parts.values()] + books(), 22, 58),
+        ("two-tone as printed", whole, 22, 58),
+        ("loaded", [(p, shade(n)) for n, p in parts.items()] + books(), 22, 58),
         ("exploded", exploded, 20, 58),
         ("section", [(p - half, shade(n)) for n, p in parts.items()]
          + [(b - half, c) for b, c in books()], 6, 84),

@@ -1,6 +1,6 @@
 # Manga Cargo Cube — A1 mini
 
-A **true 264 mm cube** — same on every axis — printed in 12 parts that lock
+A **true 264 mm cube** — same on every axis — printed in 16 parts that lock
 together with no glue, no screws and no supports.
 
 The cube is **solid but for one book pocket**: a single wide slot milled into
@@ -9,18 +9,20 @@ snug on all four sides, standing 3 mm proud so you can grip a spine. No
 dividers, so nothing draws a line across the front. No open bay, no lid to
 lift.
 
-The exterior copies **crate C** from the reference art: light corner posts and
-a deep top cap band standing at the envelope, field panels recessed between
-them, a latch plate on the centre of each face, a wide louver recess low on the
-panel, and small label placards. A big even soft bevel on every edge and
-corner. The **lid line sits at two-thirds height**, which is where the tier
-split actually falls — the structural seam is the styling. Detail runs
-**across** the joints rather than stopping at them, and each split hides under
-a 6 mm strap, so eight octants read as one object.
+The exterior copies **crate C** from the reference art, in two tones you get
+from ordinary single-colour prints:
 
-Nothing about the styling changed how it cuts: all relief is subtracted from
-the 264 mm envelope, so the split planes, the locks and the print orientations
-are untouched.
+- The **whole cap tier is the light lid**, so the tier split and the colour
+  split are the same line — print the four `cap_*` parts in cream.
+- The **corner posts are separate slide-on covers**, so they are cream too and
+  run the full height of the body, as on the reference. Each drops over its
+  rebated corner and is then trapped by the cap landing on it.
+- The **body** is yellow: four `base_*` octants carrying the recessed field
+  panels, each with a latch plate, a wide louver recess and small label
+  placards.
+
+The posts go **46 mm deep on the side faces** and 31 mm on the front. Only the
+front is capped by the pocket, and only the front needed to be.
 
 ![preview](docs/cube_preview.png)
 
@@ -44,13 +46,12 @@ coarsest split that works: eight 108 mm octants, plus four spline keys.
 carry the cap's dovetail channels. At 224 mm that margin falls to 11 mm and the
 lock has nowhere to live.
 
-## What the reference could not give us
+## What the pocket still costs
 
-Crate C's corner posts are far chunkier than these. They cannot be: the pocket
-for ten volumes is 202 mm of the 264 mm face, so only 31 mm of margin remains
-either side, and the posts have to live in it. The front face is mostly pocket
-for the same reason, so the crate styling is carried by the other three faces,
-the cap band and the foot band.
+The front face is mostly pocket — ten volumes are 202 mm of a 264 mm face — so
+the crate styling is carried by the other three faces plus the cap and foot
+bands, and the front post arms are held to 31 mm. Everything else the reference
+has, this has.
 
 ## How it locks
 
@@ -79,22 +80,23 @@ also pulls a base octant sideways and checks it fouls its key.
 1. Butt the four `base_*` octants together on a flat surface.
 2. Drop `key_1`–`key_4` down the vertical seams. The lower ring is now locked
    laterally.
-3. For each `cap_*` octant: set it on its quarter 8 mm forward, lower it, slide
-   it back until it stops. It is now locked down and the keys beneath are
-   captive.
+3. Drop each `post_*` cover down over its rebated corner.
+4. For each `cap_*` octant: set it on its quarter 8 mm forward, lower it, slide
+   it back until it stops. It is now locked down, and the keys and post covers
+   beneath it are captive.
 
 ## Specification
 
 | | |
 | --- | --- |
 | Assembled | 264 × 264 × 264 mm, true cube |
-| Parts | 8 octants (176 mm base, 94 mm cap) + 4 spline keys |
+| Parts | 8 octants (176 mm base, 88 mm cap) + 4 post covers + 4 keys |
 | Capacity | 10 volumes, pressed together in one pocket |
 | Pocket | 202 × 124 × 194 mm — 2 mm slack over 10 spines, books 3 mm proud |
 | Floor / ceiling | 34 / 36 mm |
 | Lid line / tier split | 176 mm, two-thirds height |
 | Cap lock | 8 dovetail tenons, 8 mm travel, blind channels, 0.20 mm fit |
-| Material | 9980 cm³ solid across all parts |
+| Material | 10183 cm³ solid across all parts |
 
 ## Printing
 
@@ -121,8 +123,9 @@ Everything lives in the `PARAMETERS` block of `src/manga_cube.py`.
 
 - `N_BOOKS` — capacity, and the thing that sets `SIDE`
 - `SIDE` — the cube. Below ~213 mm the book no longer fits standing
-- `BASE_H`, `CAP_H`, `POST_L`, `PLATE`, `VENT`, `PLACARD` — the crate C
-  exterior. `POST_L` is capped by the pocket margin
+- `POST_FRONT` / `POST_SIDE`, `BASE_H`, `PLATE`, `VENT`, `PLACARD` — the
+  crate C exterior. Only `POST_FRONT` is capped by the pocket
+- `COVER_T` / `COVER_FIT` — the slide-on corner post covers
 - `N_BOOKS`, `SLOT_*`, `BOOK_*` — the pocket and the media it is cut for
 - `EDGE_CH` / `CORNER_CH`, `PANEL_R`, `EMBLEM_*`, `SEAM_Z` — the loot-box look:
   bevel size, panel corner radius, the disc plate, and the lid line
@@ -138,8 +141,9 @@ Four rules the code depends on:
 - The seam straps sit at the full envelope **on purpose**: every split line
   lands under one, so a joint reads as a strap rather than a crack. The
   horizontal one doubles as the loot-box lid line.
-- The emblem is offset sideways because a face-centred disc would be bisected
-  by the vertical seam strap.
+- The post covers' arm bands must reach **past the edge chamfer**. The chamfer
+  truncates the corner, so a band only as deep as the cover leaves the two
+  arms meeting nowhere and the cover comes out as two loose pieces.
 - `skin_side()` exists because `profile()` insets in Z as well as X and Y, so a
   plain `skin()` carries full-width slabs at the crown and base. Cutting with
   those shaves the ends; clipping them off in Z instead lands a cut plane on
@@ -165,11 +169,9 @@ six-volume cube — are in git history on this branch.
 
 ## Two-tone
 
-Printing the four `cap_*` parts and the keys in cream and the four `base_*`
-parts in yellow puts the light band across the top third, which is where crate
-C's light lid sits.
+Cream: the four `cap_*` octants and the four `post_*` covers.
+Yellow: the four `base_*` octants.
+The keys are hidden once assembled, so any colour.
 
-It will not colour the corner posts, though — those run the full height and so
-are split between both tiers. Matching the reference exactly needs either a
-multi-colour print or the posts broken out as separate clip-on pieces, which
-would add four more parts.
+That is the reference crate's scheme exactly, from single-colour prints — the
+posts are separate parts precisely so the colour can reach them.

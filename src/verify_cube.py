@@ -57,8 +57,10 @@ def main() -> int:
     caps = {k: v for k, v in parts.items() if k.startswith("cap")}
     bases = {k: v for k, v in parts.items() if k.startswith("base")}
     keys = {k: v for k, v in parts.items() if k.startswith("key")}
+    posts = {k: v for k, v in parts.items() if k.startswith("post")}
 
-    check("12 parts", len(parts) == 12, f"{len(parts)}")
+    check("16 parts", len(parts) == 16, f"{len(parts)}")
+    check("four corner post covers", len(posts) == 4, f"{len(posts)}")
 
     # ---- every part is printable and sane -------------------------------
     for name, part in parts.items():
@@ -170,6 +172,23 @@ def main() -> int:
         check(f"{name}: blind channel stops it flush", over > 1.0,
               f"{over:.1f} mm^3 if pushed 1 mm past")
 
+    # ---- the corner post covers ------------------------------------------
+    # Each drops down over its rebated corner, then the cap traps it.
+    for name, cov in posts.items():
+        check(f"{name}: seats without interference",
+              max(clash(b, cov) for b in bases.values()) < 1e-6)
+        worst = max(clash(body, cov.translate([0, 0, dz]))
+                    for dz in np.arange(0.0, 60.0, 2.0))
+        check(f"{name}: drops straight down onto its rebate", worst < 1e-6,
+              f"worst {worst:.2f} mm^3")
+        top = cov.bounding_box()[5]
+        check(f"{name}: cap lands on it, so it cannot back out",
+              abs(top - C.zc(C.SEAM_Z)) < 1e-6,
+              f"top at {top + C.HZ:.1f} mm, seam at {C.SEAM_Z:.0f} mm")
+        thin = cov.bounding_box()
+        check(f"{name}: is a contrast-colour shell, not a block",
+              cov.volume() < 60000.0, f"{cov.volume()/1000:.1f} cm^3")
+
     # ---- the spline keys -------------------------------------------------
     for name, key in keys.items():
         bb = key.bounding_box()
@@ -199,7 +218,7 @@ def main() -> int:
     print()
     print(f"assembled       : {C.SIDE:.0f} mm cube, true on all axes")
     print(f"parts           : 8 octants ({C.SEAM_Z:.0f} mm base, "
-          f"{C.SIDE - C.SEAM_Z:.0f} mm cap) + 4 spline keys")
+          f"{C.SIDE - C.SEAM_Z:.0f} mm cap) + 4 post covers + 4 spline keys")
     print(f"capacity        : {capacity} x {C.BOOK_THICK:.0f} mm volumes")
     print(f"material        : {total/1000:.0f} cm^3 solid across all parts")
     print(f"cap lock        : {len(C.TEN_AT)*2} tenons, {C.TRAVEL:.0f} mm travel,"

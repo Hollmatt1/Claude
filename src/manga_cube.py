@@ -89,7 +89,13 @@ RELIEF_VENT = 8.5             # louvers, sunk below the panel floor
 # One panel per face, spanning both seams, rather than four tiles: detail that
 # runs across a joint is what makes eight parts read as one object. The seams
 # themselves get a scribed panel line instead of a wide cover strap.
-POST_L = 30.0                 # corner castings
+# The post arm is capped by the pocket only on the faces the pocket opens
+# through. The side faces have no such limit, so the posts go much deeper there
+# and read like the reference's castings.
+POST_FRONT = 31.0             # arm on the +/-Y faces, capped by the pocket
+POST_SIDE = 46.0              # arm on the +/-X faces, free
+COVER_T = 3.0                 # corner posts are separate slide-on covers, so
+COVER_FIT = 0.25              # they can be printed in the contrast colour
 SEAM_W = 6.0                  # strap sitting on each split
 SEAM_Z = 176.0                # the tier split, at two thirds height: this is
                               # the lid line, which is what a loot box reads by
@@ -97,17 +103,18 @@ SEAM_Z = 176.0                # the tier split, at two thirds height: this is
 # standing at the envelope, yellow field panels recessed between them, a latch
 # plate on the centre of each face, and small label placards.
 BASE_H = 26.0                 # foot band
-CAP_H = 46.0                  # top cap band - the deep light lid
+# The whole cap tier is the light lid, so the tier split and the colour split
+# are the same line and the field panels live entirely in the base tier.
 PANEL_R = 18.0                # rounded panel corners
 BEVEL_STEP = 2.0
 BOLT_R = 3.4
 PLATE = (84.0, 26.0)          # raised latch plate on the centre of a face
-PLATE_Z = 150.0
+PLATE_Z = 132.0
 VENT = (120.0, 16.0)          # wide shallow louver recess low on the panel
-VENT_Z = 62.0
+VENT_Z = 58.0
 VENT_D = 2.5
 PLACARD = (34.0, 16.0)        # small label plate
-PLACARD_Z = 196.0
+PLACARD_Z = 162.0
 PLACARD_U = 52.0
 PLACARD_D = 1.4
 
@@ -252,6 +259,11 @@ def mesh_report(mesh: trimesh.Trimesh) -> tuple[int, bool]:
 # seams are simply the areas the recessed panels do not reach.
 # --------------------------------------------------------------------------
 
+def post_arm(axis):
+    """How far the corner post reaches in across this face."""
+    return POST_SIDE if axis == 0 else POST_FRONT
+
+
 def seam_ribs() -> Manifold:
     """A strap standing on each split, on every face.
 
@@ -276,9 +288,10 @@ def bolt_heads() -> Manifold:
     out = None
     for axis in (0, 1):
         for sign in (1, -1):
-            for u in (HX - POST_L / 2, -(HX - POST_L / 2)):
-                for h in (BASE_H / 2, 92.0, SIDE - CAP_H / 2 - 14,
-                          SIDE - CAP_H / 2 + 12):
+            arm = post_arm(axis)
+            for u in (HX - arm / 2, -(HX - arm / 2)):
+                for h in (BASE_H / 2, 96.0, SEAM_Z - 20.0,
+                          SEAM_Z + (SIDE - SEAM_Z) / 2):
                     c = Manifold.cylinder(60.0, BOLT_R, BOLT_R, 24, True)
                     c = (c.rotate([0, 90, 0]).translate([sign * HX, u, zc(h)])
                          if axis == 0 else
@@ -314,9 +327,12 @@ def rounded(axis, sign, u0, u1, z0, z1, r, grow=0.0):
 
 
 def face_panel(axis, sign, grow=0.0):
-    """The recessed field panel: everything the posts and bands do not cover."""
-    u = HX - POST_L
-    return rounded(axis, sign, -u, u, BASE_H, SIDE - CAP_H, PANEL_R, grow)
+    """The recessed field panel: everything the posts and bands do not cover.
+
+    It stops at the tier split, because the whole cap tier is the light lid.
+    """
+    u = HX - post_arm(axis)
+    return rounded(axis, sign, -u, u, BASE_H, SEAM_Z, PANEL_R, grow)
 
 
 def plate(axis, sign):
@@ -340,6 +356,40 @@ def placard(axis, sign):
                     PLACARD_Z - h / 2, PLACARD_Z + h / 2, 4.0)
         out = r if out is None else out + r
     return out
+
+
+def post_region(sx, sy, shrink=0.0):
+    """The L-shaped corner post: what neither face panel reaches.
+
+    Each arm is confined to the face it belongs to. Taking the two half-spaces
+    unrestricted instead sweeps the middle of the opposite face into the post,
+    which is field, not casting.
+    """
+    # Wide enough to reach past the edge chamfer. The chamfer truncates the
+    # corner, so a band only as deep as the cover leaves the two arms meeting
+    # nowhere and the cover comes out as two loose pieces.
+    d = EDGE_CH + COVER_T + 2.0
+    arm_y = box(sx * (HX - POST_FRONT + shrink), sx * BIG,
+                sy * (HY - d), sy * BIG, -BIG, BIG)       # on the +/-Y face
+    arm_x = box(sx * (HX - d), sx * BIG,
+                sy * (HY - POST_SIDE + shrink), sy * BIG, -BIG, BIG)
+    return arm_y + arm_x
+
+
+def post_cover(sx, sy, part=True):
+    """The slide-on cover for one corner post, or the rebate that receives it.
+
+    A tier-based colour split cannot reach the posts - they run the full
+    height. Making them separate covers can. Each drops down over its rebated
+    corner and is then trapped by the cap landing on top of it, so it needs no
+    glue, like everything else here.
+    """
+    if part:
+        return (skin(0.0, COVER_T) ^ post_region(sx, sy, shrink=COVER_FIT)
+                ^ box(-BIG, BIG, -BIG, BIG,
+                      zc(BASE_H + COVER_FIT), zc(SEAM_Z)))
+    return (skin(0.0, COVER_T + 0.2) ^ post_region(sx, sy)
+            ^ box(-BIG, BIG, -BIG, BIG, zc(BASE_H), zc(SEAM_Z)))
 
 
 # --------------------------------------------------------------------------
@@ -525,6 +575,8 @@ def split_parts() -> dict[str, Manifold]:
     lower = solid ^ box(-BIG, BIG, -BIG, BIG, -BIG, sz)
     upper = solid ^ box(-BIG, BIG, -BIG, BIG, sz, BIG)
     lower -= body_cut + grooves
+    for sx, sy in itertools.product((1, -1), repeat=2):
+        lower -= post_cover(sx, sy, part=False)
     upper += tenons
 
     for sx, sy in itertools.product((1, -1), repeat=2):
@@ -534,6 +586,8 @@ def split_parts() -> dict[str, Manifold]:
         ny = "F" if sy > 0 else "B"
         parts[f"base_{ny}{nx}"] = cleanup(lower ^ quad, f"base_{ny}{nx}")
         parts[f"cap_{ny}{nx}"] = cleanup(upper ^ quad, f"cap_{ny}{nx}")
+        parts[f"post_{ny}{nx}"] = cleanup(post_cover(sx, sy),
+                                         f"post_{ny}{nx}")
 
     for i, (axis, u_c, z0, z1) in enumerate(seam_keys(), start=1):
         parts[f"key_{i}"] = spline(axis, u_c, z0 + FIT, z1 - FIT,
@@ -568,7 +622,7 @@ def main() -> None:
               f"{bb[5]-bb[2]:6.1f}  {part.volume()/1000:7.1f} cm^3  "
               f"{'fits' if fits else 'TOO BIG'}"
               f"{'' if bnd == 0 and wind else '  MESH PROBLEM'}")
-    print(f"\ntotal {total/1000:.0f} cm^3 solid across 12 parts")
+    print(f"\ntotal {total/1000:.0f} cm^3 solid across {len(split_parts())} parts")
 
 
 if __name__ == "__main__":
