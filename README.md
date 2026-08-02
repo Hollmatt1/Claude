@@ -1,9 +1,19 @@
 # Manga Cargo Crate — A1 mini
 
-A two-part sci-fi cargo crate for standing manga volumes: corner castings,
-X-braced recessed panels, heavy latch blocks, a front viewing hatch and a
-banded lid. Body and lid lock together with a sliding dovetail. No supports,
-no glue, no hardware.
+A two-part sci-fi cargo crate for standing manga volumes. Body and lid lock
+together with a sliding dovetail. No supports, no glue, no hardware.
+
+Detailing, all cut into the envelope rather than added onto it:
+
+- **Corner castings** running the full height, with **bolt heads** down each one
+- **Octagonal recessed panels** with a stepped bevel lip, so they read machined
+  rather than routed
+- **X-bracing** across the side and back panels
+- **Louver vent banks**, five slots per face, sunk below the panel floor
+- **Hazard striping** — 45 degree ribs in the band around the lid
+- **Latch blocks** straddling the seam, the one detail at the full envelope
+- **Front hatch** with a recessed label placard above it
+- Base shadow line and a grooved crown with grip slots
 
 ![preview](docs/crate_preview.png)
 
@@ -53,10 +63,10 @@ collisions and then checks that lifting the locked lid is actually blocked:
 | Assembled | 178 × 178 × 205 mm |
 | Body / lid | 178 × 178 × 178 mm / 178 × 178 × 33 mm |
 | Capacity | 7 volumes at 20 mm, or 6 comfortably |
-| Walls / floor | 8 mm / 7 mm, 13 mm at the lid rim |
+| Walls / floor | 10 mm / 7 mm, 13 mm at the lid rim |
 | Front hatch | 116 × 98 mm, self-supporting head |
 | Lock | 6 dovetail tenons, 8 mm travel, 0.20 mm fit |
-| Solid volume | 757 cm³ body, 280 cm³ lid |
+| Solid volume | 861 cm³ body, 276 cm³ lid |
 
 ## Printing
 
@@ -72,7 +82,7 @@ print orientation.
 - **Infill:** 10–15% gyroid
 - **Orientation:** as exported. The lid prints crown-down, which puts its best
   surface on the plate and leaves no internal overhang.
-- **Filament:** roughly 700–850 g for the pair. That's extrapolated from solid
+- **Filament:** roughly 750–900 g for the pair. That's extrapolated from solid
   volume — slice it for real numbers.
 
 If the dovetail is tight on your printer, raise `FIT`; if the lid rattles,
@@ -84,8 +94,12 @@ Everything is in the `PARAMETERS` block of `src/manga_crate.py`. Useful knobs:
 
 - `BOOK_DEPTH` / `BOOK_HEIGHT` / `BOOK_THICK` — retarget to another format
 - `TOTAL_H`, `SPLIT` — overall height and where the seam falls
-- `RELIEF_FRAME` / `RELIEF_FIELD` — how deep the panel relief cuts
-- `POST_L`, `BRACE_W`, `LATCH_W` — the crate detailing
+- `RELIEF_FRAME` / `RELIEF_BEVEL` / `RELIEF_FIELD` / `RELIEF_VENT` — the four
+  relief planes, shallowest to deepest. `RELIEF_VENT` must stay well clear of
+  `WALL`, or the louvers cut through
+- `PANEL_CHAMFER`, `BEVEL_STEP` — the octagonal panel shape and its lip
+- `VENT_N` / `VENT_PITCH`, `BOLT_R` / `BOLT_Z`, `STRIPE_PITCH` — the greebling
+- `POST_L`, `BRACE_W`, `LATCH_W` — castings, bracing, latches
 - `TRAVEL`, `DT_*`, `FIT` — the dovetail
 - `MARGIN` — raise it if your plate complains at 178 mm
 
@@ -93,6 +107,9 @@ Two structural rules the code relies on, worth knowing before editing:
 
 - All exterior relief is **cut from** the 178 mm envelope, never added to a
   smaller body, so no detailing can push a part past the build plate.
+- `cleanup()` drops the hairline shells that coincident-surface booleans leave
+  behind (a hazard rib ending on a panel chamfer, for instance) — some with
+  negative volume. It refuses to discard anything larger than debris.
 - `skin_side()` exists because `profile()` insets in Z as well as X and Y, so a
   plain `skin()` carries full-width slabs at the crown and base. Cutting with
   those shaves the ends; clipping them off in Z instead lands a cut plane on

@@ -99,6 +99,22 @@ def main() -> int:
     check("hatch lip is solid below",
           solid_frac(body, [0, C.HX - C.RELIEF_FIELD - 2, C.zc(C.WIN_Z[0] - 14)]) > 0.9)
 
+    # Nothing may pierce a wall. The louvers are the deepest cut, and the
+    # enclosure claim depends on this.
+    behind = C.HX - C.RELIEF_VENT - 1.2
+    left = C.HX - C.RELIEF_VENT - (C.HX - C.WALL)
+    for axis, sign, label in ((0, 1, "+X"), (0, -1, "-X"),
+                              (1, -1, "-Y"), (1, 1, "+Y")):
+        base = (C.WIN_Z[0] - 4 - C.VENT_N * C.VENT_PITCH if (axis, sign) == (1, 1)
+                else C.PANEL_Z[0] + 12)
+        z = C.zc(base + 2 * C.VENT_PITCH + C.VENT_H / 2)
+        pt = [sign * behind, 0, z] if axis == 0 else [0, sign * behind, z]
+        check(f"wall intact behind {label} louvers", solid_frac(body, pt) > 0.9,
+              f"{left:.1f} mm of wall left")
+    check("wall intact behind the placard",
+          solid_frac(body, [0, C.HY - C.RELIEF_FIELD - C.PLACARD_D - 1.2,
+                            C.zc(C.PLACARD_Z)]) > 0.9)
+
     # ---- the lock -------------------------------------------------------
     # Locked: the two parts must not interfere...
     check("locked: parts do not interfere", clash(body, lid) < 1e-6,

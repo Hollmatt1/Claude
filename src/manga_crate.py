@@ -47,7 +47,7 @@ TOTAL_H = 205.0               # assembled height
 SPLIT = 178.0                 # height of the body/lid seam == max printable Z
 
 # --- shell ---
-WALL = 8.0                    # must exceed RELIEF_FIELD with margin
+WALL = 10.0                   # must exceed the deepest relief with margin
 FLOOR = 7.0
 LID_TOP = 5.0                 # thickness of the lid's ceiling
 RIM_W = 13.0                  # thickened wall at the top, carries the dovetail
@@ -55,8 +55,8 @@ RIM_BOT = 150.0               # height where the wall thickens
 TAPER_H = 8.0                 # 45 deg funnel from cavity up into the rim
 
 # --- bevels ---
-EDGE_CH = 8.0
-CORNER_CH = 15.0
+EDGE_CH = 10.0
+CORNER_CH = 22.0
 
 # --- the media ---
 BOOK_DEPTH = 127.0
@@ -86,9 +86,20 @@ PANEL2_Z = (190.0, 200.0)     # short field strip breaking up the lid band
 # Relief is cut *into* the 178 mm envelope rather than added onto a smaller
 # body, so no detail can ever push the part past the build plate. Latch blocks
 # sit at the envelope; everything else steps back from it.
-RELIEF_FRAME = 2.0     # corner castings, rails
-RELIEF_FIELD = 4.5     # recessed panels between them
+RELIEF_FRAME = 2.0     # corner castings, rails, bolt heads
+RELIEF_BEVEL = 3.2     # first step of the panel edge, reads as a machined lip
+RELIEF_FIELD = 5.0     # floor of the recessed panels
+RELIEF_VENT = 7.0      # louver slots, sunk below the panel floor
 BRACE_W = 10.0
+PANEL_CHAMFER = 22.0   # corner cut on the panels -> octagonal, not rectangular
+BEVEL_STEP = 1.6       # how far the bevel lip stands outside the panel
+VENT_N = 5             # louvers per bank
+VENT_H = 5.0
+VENT_PITCH = 9.0
+BOLT_R = 3.2           # bolt heads on the corner castings
+BOLT_Z = (28.0, 74.0, 120.0, 158.0)
+STRIPE_W = 6.0         # hazard striping in the lid band
+STRIPE_PITCH = 15.0
 PLINTH = 2.5                  # base shadow groove depth
 PLINTH_RIM = 14.0             # inset from the edge to the groove
 PLINTH_W = 6.0                # groove width, narrow enough to bridge
@@ -211,7 +222,7 @@ def dovetail(x_centre, y0, y1, top_w, bot_w, z_bot, z_top) -> Manifold:
 # --------------------------------------------------------------------------
 
 def latch_blocks() -> Manifold:
-    """The four clamp blocks. These alone sit at the full envelope."""
+    """The four clamp blocks. These sit at the full envelope."""
     z0, z1 = LATCH_Z
     out = None
     for axis in (0, 1):
@@ -226,39 +237,105 @@ def latch_blocks() -> Manifold:
     return out
 
 
+def bolt_heads() -> Manifold:
+    """Bolt heads down the corner castings, left standing at the envelope."""
+    out = None
+    for axis in (0, 1):
+        for sign in (1, -1):
+            for u in (HX - POST_L / 2, -(HX - POST_L / 2)):
+                for h in BOLT_Z:
+                    c = Manifold.cylinder(40.0, BOLT_R, BOLT_R, 24, True)
+                    if axis == 0:
+                        c = c.rotate([0, 90, 0]).translate(
+                            [sign * HX, u, zc(h)])
+                    else:
+                        c = c.rotate([90, 0, 0]).translate(
+                            [u, sign * HY, zc(h)])
+                    out = c if out is None else out + c
+    return out
+
+
 def _face_box(axis, sign, u0, u1, z0, z1):
     """A region on one face, spanning `u0`..`u1` across it and `z0`..`z1` up."""
     if axis == 0:
-        return box(sign * (HX - RELIEF_FIELD - 2), sign * BIG,
+        return box(sign * (HX - RELIEF_VENT - 2), sign * BIG,
                    u0, u1, zc(z0), zc(z1))
-    return box(u0, u1, sign * (HY - RELIEF_FIELD - 2), sign * BIG,
+    return box(u0, u1, sign * (HY - RELIEF_VENT - 2), sign * BIG,
                zc(z0), zc(z1))
 
 
-def field_regions() -> tuple[Manifold, Manifold]:
-    """Recessed panel regions, and the X-braces standing inside them."""
-    u = HX - POST_L                # panels stop short of the corner castings
-    fields = None
-    braces = None
+def _diamond(axis, z_mid, reach):
+    """|u| + |z - z_mid| <= reach, in the plane of the given face."""
+    s = reach * np.sqrt(2.0)
+    if axis == 0:
+        d = Manifold.cube([BIG, s, s], True).rotate([45, 0, 0])
+    else:
+        d = Manifold.cube([s, BIG, s], True).rotate([0, 45, 0])
+    return d.translate([0, 0, z_mid])
+
+
+def panel(axis, sign, u_half, z0, z1, grow=0.0):
+    """An octagonal panel region: rectangle with its corners cut back."""
+    a = u_half + grow
+    b = (z1 - z0) / 2 + grow
+    z_mid = zc((z0 + z1) / 2)
+    rect = _face_box(axis, sign, -a, a, z0 - grow, z1 + grow)
+    return rect ^ _diamond(axis, z_mid, a + b - PANEL_CHAMFER)
+
+
+def diagonal_ribs(axis, sign, u_half, z0, z1):
+    """Hazard striping: parallel 45 degree ribs across a band."""
+    h = z1 - z0
+    out = None
+    u = -u_half - h
+    while u < u_half + h:
+        ends = [_face_box(axis, sign, uu - STRIPE_W / 2, uu + STRIPE_W / 2,
+                          zz - STRIPE_W / 2, zz + STRIPE_W / 2)
+                for uu, zz in ((u, z0), (u + h, z1))]
+        rib = Manifold.batch_hull(ends)
+        out = rib if out is None else out + rib
+        u += STRIPE_PITCH
+    return out
+
+
+def field_regions() -> tuple[Manifold, Manifold, Manifold, Manifold]:
+    """Panel bevels, panel floors, louver slots, and the detail left standing."""
+    u = HX - POST_L
+    bevels = fields = vents = keeps = None
+
+    def add(acc, r):
+        return r if acc is None else acc + r
 
     for axis, sign in ((0, 1), (0, -1), (1, -1), (1, 1)):
-        for z0, z1 in (PANEL_Z, PANEL2_Z):
-            r = _face_box(axis, sign, -u, u, z0, z1)
-            fields = r if fields is None else fields + r
-
-        if (axis, sign) == (1, 1):
-            continue               # the front carries the hatch, not a brace
-
         z0, z1 = PANEL_Z
-        panel = _face_box(axis, sign, -u, u, z0, z1)
-        for (ua, za), (ub, zb) in ([(-u, z0), (u, z1)], [(-u, z1), (u, z0)]):
-            ends = [_face_box(axis, sign, uu - BRACE_W / 2, uu + BRACE_W / 2,
-                              zz - BRACE_W / 2, zz + BRACE_W / 2)
-                    for uu, zz in ((ua, za), (ub, zb))]
-            rib = Manifold.batch_hull(ends) ^ panel
-            braces = rib if braces is None else braces + rib
+        bevels = add(bevels, panel(axis, sign, u, z0, z1, grow=BEVEL_STEP))
+        fields = add(fields, panel(axis, sign, u, z0, z1))
 
-    return fields, braces
+        b0, b1 = PANEL2_Z
+        bevels = add(bevels, panel(axis, sign, u, b0, b1, grow=BEVEL_STEP))
+        band = panel(axis, sign, u, b0, b1)
+        fields = add(fields, band)
+        keeps = add(keeps, diagonal_ribs(axis, sign, u, b0, b1) ^ band)
+
+        pan = panel(axis, sign, u, z0, z1)
+        if (axis, sign) == (1, 1):
+            # the front carries the hatch; vent it below the opening instead
+            base = WIN_Z[0] - 4 - VENT_N * VENT_PITCH
+        else:
+            base = z0 + 12
+            for (ua, za), (ub, zb) in ([(-u, z0 + 40), (u, z1)],
+                                       [(-u, z1), (u, z0 + 40)]):
+                ends = [_face_box(axis, sign, uu - BRACE_W / 2, uu + BRACE_W / 2,
+                                  zz - BRACE_W / 2, zz + BRACE_W / 2)
+                        for uu, zz in ((ua, za), (ub, zb))]
+                keeps = add(keeps, Manifold.batch_hull(ends) ^ pan)
+
+        for i in range(VENT_N):
+            zv = base + i * VENT_PITCH
+            slot = _face_box(axis, sign, -u + 14, u - 14, zv, zv + VENT_H) ^ pan
+            vents = add(vents, slot)
+
+    return bevels, fields, vents, keeps
 
 
 # --------------------------------------------------------------------------
@@ -268,20 +345,23 @@ def field_regions() -> tuple[Manifold, Manifold]:
 def build_assembly() -> Manifold:
     solid = profile()
 
-    # step the vertical faces back to the frame plane, sparing the latch blocks
-    solid -= skin_side(0.0, RELIEF_FRAME) - latch_blocks()
+    # step the vertical faces back, sparing the latch blocks and bolt heads
+    solid -= skin_side(0.0, RELIEF_FRAME) - (latch_blocks() + bolt_heads())
 
-    # sink the field panels deeper still, leaving the braces standing proud
-    fields, braces = field_regions()
-    solid -= (skin_side(RELIEF_FRAME, RELIEF_FIELD) ^ fields) - braces
+    # panels: a shallow bevel lip, then the panel floor, then the louvers,
+    # with braces and hazard striping left standing at the frame plane
+    bevels, fields, vents, keeps = field_regions()
+    solid -= (skin_side(RELIEF_FRAME, RELIEF_BEVEL) ^ bevels) - keeps
+    solid -= (skin_side(RELIEF_BEVEL, RELIEF_FIELD) ^ fields) - keeps
+    solid -= skin_side(RELIEF_FIELD, RELIEF_VENT) ^ vents
 
     # label placard, recessed into the front panel
-    solid -= (box(-PLACARD[0] / 2, PLACARD[0] / 2, HY - 6, BIG,
+    solid -= (box(-PLACARD[0] / 2, PLACARD[0] / 2, HY - 8, BIG,
                   zc(PLACARD_Z - PLACARD[1] / 2), zc(PLACARD_Z + PLACARD[1] / 2))
               ^ skin_side(RELIEF_FIELD, RELIEF_FIELD + PLACARD_D))
 
-    # Crown of the lid: an outline groove and grip slots rather than one broad
-    # pocket. The lid prints crown-down, so any wide recess here would be an
+    # crown of the lid: an outline groove and grip slots rather than one broad
+    # pocket. The lid prints crown-down, so a wide recess here would be an
     # unsupported ceiling over the plate; narrow grooves bridge instead.
     top = zc(TOTAL_H - 6)
     crown = (box(-55, 55, -55, 55, top, BIG) - box(-48, 48, -48, 48, top, BIG))
@@ -289,9 +369,8 @@ def build_assembly() -> Manifold:
         crown += box(-45, 45, y - 4, y + 4, top, BIG)
     solid -= crown ^ skin(0.0, CROWN_D)
 
-    # Base shadow line: a perimeter groove, not a full-area recess. Recessing
-    # the whole underside would leave the floor bridging ~150 mm on the first
-    # layers above it.
+    # base shadow line: a perimeter groove, not a full-area recess, which would
+    # leave the floor bridging ~150 mm on the layers above it
     r0, r1 = HX - PLINTH_RIM, HX - PLINTH_RIM - PLINTH_W
     solid -= (box(-r0, r0, -r0, r0, zc(-1), zc(PLINTH))
               - box(-r1, r1, -r1, r1, zc(-1), zc(PLINTH)))
@@ -312,11 +391,8 @@ def build_assembly() -> Manifold:
                 zc(TOTAL_H - LID_TOP))
     solid -= lower + funnel + upper
 
-    # --- front hatch, flared 45 deg so its head bridges itself ---
+    # --- front hatch, flared in Z so its head bridges itself ---
     wz0, wz1 = WIN_Z
-    # Flared in Z only. The head of the opening needs the 45 deg underside to
-    # bridge; the jambs are vertical walls and need nothing - and a sideways
-    # flare this deep would run out past the corner castings and notch them.
     flare = WALL * 1.25
     mouth = Manifold.batch_hull([
         box(-WIN_W / 2, WIN_W / 2, cav, cav + 0.01, zc(wz0), zc(wz1)),
@@ -329,8 +405,6 @@ def build_assembly() -> Manifold:
     # --- floor rails keeping the stack centred ---
     for s_ in (1, -1):
         y0, y1 = sorted((s_ * RAIL_GAP / 2, s_ * (RAIL_GAP / 2 + RAIL_W)))
-        # start below the floor so the rail fuses with it instead of resting
-        # on a coincident plane, which leaves it a separate body
         solid += box(-cav, cav, y0, y1, zc(FLOOR - 1), zc(FLOOR + RAIL_H))
 
     return solid
@@ -365,7 +439,26 @@ def split_parts(assembly: Manifold) -> tuple[Manifold, Manifold]:
             lid += box(x - DT_TOP_W / 2, x + DT_TOP_W / 2, y0, y1,
                        zc(SPLIT + SEAM_GAP - 0.5), zc(SPLIT + SEAM_GAP + 1.5))
 
-    return body, lid
+    return cleanup(body, "body"), cleanup(lid, "lid")
+
+
+def cleanup(part: Manifold, name: str) -> Manifold:
+    """Drop degenerate shells left behind by coincident-surface booleans.
+
+    Where a cut lands exactly on an existing edge - a hazard rib ending on a
+    panel's chamfer, a bevel meeting the corner castings - the boolean can
+    leave hairline shells of nearly zero, or even negative, volume. They are
+    not printable geometry and they upset slicers, so keep the real body; but
+    refuse to discard anything big enough to be an actual feature.
+    """
+    comps = sorted(part.decompose(), key=lambda m: m.volume(), reverse=True)
+    if len(comps) <= 1:
+        return part
+    debris = sum(abs(c.volume()) for c in comps[1:])
+    if debris > 100.0:
+        raise SystemExit(f"{name}: {debris:.1f} mm^3 in {len(comps)-1} extra "
+                         f"bodies - too big to be boolean debris, investigate")
+    return comps[0]
 
 
 def to_trimesh(solid: Manifold) -> trimesh.Trimesh:
