@@ -141,6 +141,36 @@ NEW = [("Brady Laubach","Laubach","No",""), ("Shannon Laubach","Laubach","No",""
        ("PD","PD","No","Full name to confirm"),
        ("PD's wife","PD","No","Name to confirm")]
 
+
+# Emma's friends - added after the Holliday-side friends
+EMMA_FRIENDS_NEW = [
+    ("Nathaniel", "Nathaniel & Rachel", "No", ""),
+    ("Rachel", "Nathaniel & Rachel", "No", "Last name to confirm - not Rachel Lane or Rachel Guy"),
+    ("Viet", "Viet & Debbie", "No", "Last name to confirm"),
+    ("Debbie", "Viet & Debbie", "No", "Last name to confirm"),
+    ("Noah", "Noah & Emily", "No", "Last name to confirm"),
+    ("Emily", "Noah & Emily", "No", "Last name to confirm"),
+    ("Michael", "Michael & Alisa", "No", "Last name to confirm - not Michael Rumende or Michael on row 36"),
+    ("Alisa", "Michael & Alisa", "No", "Last name to confirm"),
+    ("Grant", "Grant & Samantha", "No", "Last name to confirm"),
+    ("Samantha", "Grant & Samantha", "No", "Last name to confirm"),
+    ("Garrett", "Garrett & Moriah", "No", "Last name to confirm - not Garrett Thurmond"),
+    ("Moriah", "Garrett & Moriah", "No", "Last name to confirm"),
+    ("Madeleine Harris", "Harris", "No", ""),
+    ("Bee Icayan", "Icayan", "No", ""),
+    ("Anna Ruth Flagg", "Flagg", "No", ""),
+    ("Rhiannon Beard", "Beard", "No", ""),
+    ("Rhiannon Beard's +1", "Beard", "TBD", "+1 to confirm"),
+    ("Megan Rogers", "Rogers", "No", ""),
+    ("Norma Street", "Street", "No", ""),
+    ("Jay Street", "Street", "No", ""),
+    ("Jackie Santander", "Santander", "No", "Possible overlap with Jackie on row 91 - check"),
+    ("Chris Santander", "Santander", "No", "Possible overlap with Chris / Chris' wife on rows 101-102 - check"),
+    ("Sheona", "Sheona & Issac", "No", "Last name to confirm"),
+    ("Issac", "Sheona & Issac", "No", "Spelling to confirm - Issac or Isaac?"),
+    ("Rachel Guy", "Guy", "No", ""),
+]
+
 guests = []
 for n, h, s, p, note in T1:
     guests.append([n, "Holliday", "Family (Tier 1)", h, s, p, note])
@@ -159,6 +189,8 @@ guests.append(["Matt", "Couple", "Bride & Groom", "Bride & Groom", 1, "No",
                "Groom - delete this row if the counts should mean invited guests only"])
 for n, h, p, note in NEW:
     guests.append([n, "Holliday", "Friends (Tier 4)", h, 1, p, note])
+for n, h, p, note in EMMA_FRIENDS_NEW:
+    guests.append([n, "Emma", "Friends", h, 1, p, note])
 
 title_block(gl, "GUEST LIST", "Your full list, organized by side and tier. Adjust party sizes as +1s are confirmed.", len(GL_HEAD))
 header_row(gl, 3, GL_HEAD)
@@ -257,7 +289,8 @@ for i, h in enumerate(["Side", "Category", "Parties", "Guests"], start=1):
     c.border = BORDER
 GROUPS = [("Holliday", "Family (Tier 1)"), ("Holliday", "Framily (Tier 2)"),
           ("Holliday", "Influences (Tier 3)"), ("Holliday", "Friends (Tier 4)"),
-          ("Emma", "Family"), ("Emma", "Parents' Friends"), ("Couple", "Bride & Groom")]
+          ("Emma", "Family"), ("Emma", "Parents' Friends"), ("Emma", "Friends"),
+          ("Couple", "Bride & Groom")]
 for i, (side, cat) in enumerate(GROUPS):
     r = 20 + i
     ov.cell(row=r, column=1, value=side)

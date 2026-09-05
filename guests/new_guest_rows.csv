@@ -1,6 +1,6 @@
 #,Guest / Party,Side,Category,Household / Group,Party Size,+1?,Mailing Address,Phone,Email,Save-the-Date Sent,Invite Sent,RSVP,# Attending,Meal Choice,Gift Received,Thank-You Sent,Notes
-110,Emma,Emma,Couple,Bride & Groom,1,No,,,,No,,Pending,,,,,Bride - remove if you don't count yourselves as invited guests
-111,Matt,Holliday,Couple,Bride & Groom,1,No,,,,No,,Pending,,,,,Groom - remove if you don't count yourselves as invited guests
+110,Emma,Couple,Bride & Groom,Bride & Groom,1,No,,,,No,,Pending,,,,,Bride - delete this row if the counts should mean invited guests only
+111,Matt,Couple,Bride & Groom,Bride & Groom,1,No,,,,No,,Pending,,,,,Groom - delete this row if the counts should mean invited guests only
 112,Brady Laubach,Holliday,Friends (Tier 4),Laubach,1,No,,,,No,,Pending,,,,,
 113,Shannon Laubach,Holliday,Friends (Tier 4),Laubach,1,No,,,,No,,Pending,,,,,
 114,Garrett Thurmond,Holliday,Friends (Tier 4),Thurmond,1,No,,,,No,,Pending,,,,,
@@ -24,9 +24,9 @@
 132,Walker Bradley,Holliday,Friends (Tier 4),Bradley,1,No,,,,No,,Pending,,,,,
 133,Jordan Bradley,Holliday,Friends (Tier 4),Bradley,1,No,,,,No,,Pending,,,,,
 134,Jon Barnett,Holliday,Friends (Tier 4),Barnett,1,No,,,,No,,Pending,,,,,
-135,Abby / Maria,Holliday,Friends (Tier 4),Barnett,1,No,,,,No,,Pending,,,,,"Abby or Maria? Confirm name, and confirm she is Jon's guest"
+135,Abby / Maria,Holliday,Friends (Tier 4),Barnett,1,No,,,,No,,Pending,,,,,"Abby or Maria? Confirm name, and that she is Jon's guest"
 136,Jack Baker,Holliday,Friends (Tier 4),Baker,1,No,,,,No,,Pending,,,,,
-137,Andrew,Holliday,Friends (Tier 4),Andrew,1,No,,,,No,,Pending,,,,,Last name to confirm - not the Andrew Wexler already on row 12
+137,Andrew,Holliday,Friends (Tier 4),Andrew,1,No,,,,No,,Pending,,,,,Last name to confirm - not the Andrew Wexler on row 12
 138,Aaron,Holliday,Friends (Tier 4),Aaron,1,No,,,,No,,Pending,,,,,Last name to confirm
 139,Nick Stonaker,Holliday,Friends (Tier 4),Stonaker,1,No,,,,No,,Pending,,,,,
 140,Nick Stonaker's +1,Holliday,Friends (Tier 4),Stonaker,1,TBD,,,,No,,Pending,,,,,+1 to confirm
@@ -38,9 +38,34 @@
 146,Momoka,Holliday,Friends (Tier 4),Shun & Momoka,1,No,,,,No,,Pending,,,,,Last name to confirm
 147,David Wadijija,Holliday,Friends (Tier 4),Wadijija,1,No,,,,No,,Pending,,,,,Spelling to confirm
 148,David Wadijija's +1,Holliday,Friends (Tier 4),Wadijija,1,TBD,,,,No,,Pending,,,,,+1 to confirm
-149,[Placeholder - name TBD],Holliday,Friends (Tier 4),Placeholder,1,No,,,,No,,Pending,,,,,Listed as 'ZZZZZZZ' in your list - decide who to add
+149,[Placeholder - name TBD],Holliday,Friends (Tier 4),Placeholder,1,No,,,,No,,Pending,,,,,Listed as 'ZZZZZZZ' - decide who to add
 150,[Placeholder]'s +1,Holliday,Friends (Tier 4),Placeholder,1,TBD,,,,No,,Pending,,,,,+1 to confirm
 151,Michael Rumende,Holliday,Friends (Tier 4),Rumende,1,No,,,,No,,Pending,,,,,
 152,Chitra,Holliday,Friends (Tier 4),Rumende,1,No,,,,No,,Pending,,,,,Last name to confirm
 153,PD,Holliday,Friends (Tier 4),PD,1,No,,,,No,,Pending,,,,,Full name to confirm
 154,PD's wife,Holliday,Friends (Tier 4),PD,1,No,,,,No,,Pending,,,,,Name to confirm
+155,Nathaniel,Emma,Friends,Nathaniel & Rachel,1,No,,,,No,,Pending,,,,,
+156,Rachel,Emma,Friends,Nathaniel & Rachel,1,No,,,,No,,Pending,,,,,Last name to confirm - not Rachel Lane or Rachel Guy
+157,Viet,Emma,Friends,Viet & Debbie,1,No,,,,No,,Pending,,,,,Last name to confirm
+158,Debbie,Emma,Friends,Viet & Debbie,1,No,,,,No,,Pending,,,,,Last name to confirm
+159,Noah,Emma,Friends,Noah & Emily,1,No,,,,No,,Pending,,,,,Last name to confirm
+160,Emily,Emma,Friends,Noah & Emily,1,No,,,,No,,Pending,,,,,Last name to confirm
+161,Michael,Emma,Friends,Michael & Alisa,1,No,,,,No,,Pending,,,,,Last name to confirm - not Michael Rumende or Michael on row 36
+162,Alisa,Emma,Friends,Michael & Alisa,1,No,,,,No,,Pending,,,,,Last name to confirm
+163,Grant,Emma,Friends,Grant & Samantha,1,No,,,,No,,Pending,,,,,Last name to confirm
+164,Samantha,Emma,Friends,Grant & Samantha,1,No,,,,No,,Pending,,,,,Last name to confirm
+165,Garrett,Emma,Friends,Garrett & Moriah,1,No,,,,No,,Pending,,,,,Last name to confirm - not Garrett Thurmond
+166,Moriah,Emma,Friends,Garrett & Moriah,1,No,,,,No,,Pending,,,,,Last name to confirm
+167,Madeleine Harris,Emma,Friends,Harris,1,No,,,,No,,Pending,,,,,
+168,Bee Icayan,Emma,Friends,Icayan,1,No,,,,No,,Pending,,,,,
+169,Anna Ruth Flagg,Emma,Friends,Flagg,1,No,,,,No,,Pending,,,,,
+170,Rhiannon Beard,Emma,Friends,Beard,1,No,,,,No,,Pending,,,,,
+171,Rhiannon Beard's +1,Emma,Friends,Beard,1,TBD,,,,No,,Pending,,,,,+1 to confirm
+172,Megan Rogers,Emma,Friends,Rogers,1,No,,,,No,,Pending,,,,,
+173,Norma Street,Emma,Friends,Street,1,No,,,,No,,Pending,,,,,
+174,Jay Street,Emma,Friends,Street,1,No,,,,No,,Pending,,,,,
+175,Jackie Santander,Emma,Friends,Santander,1,No,,,,No,,Pending,,,,,Possible overlap with Jackie on row 91 - check
+176,Chris Santander,Emma,Friends,Santander,1,No,,,,No,,Pending,,,,,Possible overlap with Chris / Chris' wife on rows 101-102 - check
+177,Sheona,Emma,Friends,Sheona & Issac,1,No,,,,No,,Pending,,,,,Last name to confirm
+178,Issac,Emma,Friends,Sheona & Issac,1,No,,,,No,,Pending,,,,,Spelling to confirm - Issac or Isaac?
+179,Rachel Guy,Emma,Friends,Guy,1,No,,,,No,,Pending,,,,,
