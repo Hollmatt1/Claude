@@ -14,7 +14,7 @@ connector is attached), so this is a file to upload rather than an edit in place
 | Tab | Contents |
 |---|---|
 | Overview | Event details, guest summary, guests by group, budget snapshot, checklist progress — all formula-driven off the other tabs |
-| Guest List | 179 rows (109 original + 70 new), 18 columns, RSVP/`+1?` dropdowns |
+| Guest List | 183 rows (109 original + 74 new), 18 columns, RSVP/`+1?` dropdowns |
 | Budget | 28 line items in 12 categories; Balance and TOTAL calculate themselves |
 | Vendors & Contacts | 16 vendor types; Balance = Quoted − Deposit |
 | Planning Checklist | 41 tasks, 12+ months out through After; Status dropdown |
@@ -25,21 +25,27 @@ Guest counts by group, reconciled against the PDF's Overview:
 | Side | Category | Parties | Guests |
 |---|---|---:|---:|
 | Holliday | Family (Tier 1) | 10 | 19 |
-| Holliday | Framily (Tier 2) | 7 | 13 |
+| Holliday | Framily (Tier 2) | 11 | 17 |
 | Holliday | Influences (Tier 3) | 7 | 12 |
 | Holliday | Friends (Tier 4) — new, Matt's friends | 43 | 43 |
 | Emma | Family | 61 | 61 |
 | Emma | Parents' Friends | 24 | 24 |
 | Emma | Friends — new, Emma's friends | 25 | 25 |
 | Couple | Bride & Groom — new | 2 | 2 |
-| **TOTAL** | | **179** | **199** |
+| **TOTAL** | | **183** | **203** |
 
-The first five rows match the original workbook exactly, so the reconstruction is
-verified against its own totals.
+The first three Holliday tiers and both Emma groups reconciled against the PDF's own
+Overview before anything was added (10/19, 7/13, 7/12, 61/61, 24/24), so the
+reconstruction is verified against the source's totals.
+
+**No names were struck out in the source.** Every glyph in the export was tested
+against every horizontal rule on all 24 pages; not one rule crosses a character's
+midline, and there are no strikethrough font variants. Nothing scratched out was
+silently counted.
 
 ## Other files
 
-- `new_guest_rows.csv` — just the 70 additions (rows 110-179), if you'd rather paste
+- `new_guest_rows.csv` — just the 74 additions (rows 110-183), if you'd rather paste
   rows into the existing sheet than replace it.
 - `olive_palette.md` — the olive hex values and where each is applied.
 - `build_workbook.py` — the generator, so any of this can be regenerated.
@@ -52,6 +58,9 @@ verified against its own totals.
   `Holliday / Friends (Tier 4)` (rows 112-154); Emma's friends are
   `Emma / Friends` (rows 155-179). The `Side` column is what separates them, so
   either group filters on its own.
+- **The Wexler kids** (rows 180-183) go under `Framily (Tier 2)` with their parents,
+  each with a spouse +1 marked TBD. Row 12's `Household / Group` was set to `Wexler`
+  so all five rows group together; that column feeds no totals, so no count moved.
 - **Emma and Matt** are rows 110-111 under a `Couple` side so they don't inflate
   either family's group counts. Delete both if the totals should mean invited guests.
 - **Not re-added — already present:** `David tardella and wife` is row 21

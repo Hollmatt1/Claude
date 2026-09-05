@@ -78,7 +78,7 @@ T1 = [("Mom & Dad","Holliday - Immediate",2,"No","Parents"),
       ("Steve & Kathy","Steve & Kathy",2,"No",""),
       ("Nathan","Steve & Kathy",2,"TBD","+1 to confirm"),
       ("Alex","Steve & Kathy",1,"No","")]
-T2 = [("Tom Rhodes","",2,"No",""), ("Kourtney & Andrew Wexler","",1,"No",""),
+T2 = [("Tom Rhodes","",2,"No",""), ("Kourtney & Andrew Wexler","Wexler",1,"No",""),
       ("Lane & Traci Jones","",2,"No",""), ("Bill & Terry Willits","",2,"No",""),
       ("Steve & Elaine Franklin","",2,"No",""), ("Andy & Sandra Stanley","",2,"No",""),
       ("Sherri & Wes Shropshire","",2,"No","")]
@@ -171,6 +171,15 @@ EMMA_FRIENDS_NEW = [
     ("Rachel Guy", "Guy", "No", ""),
 ]
 
+
+# Wexler kids, added to the Framily (Tier 2) household
+WEXLER_KIDS = [
+    ("Ashlyn Wexler", "Wexler", "No", ""),
+    ("Ashlyn Wexler's spouse", "Wexler", "TBD", "Spouse +1 - name to confirm"),
+    ("Hamilton Wexler", "Wexler", "No", ""),
+    ("Hamilton Wexler's spouse", "Wexler", "TBD", "Spouse +1 - name to confirm"),
+]
+
 guests = []
 for n, h, s, p, note in T1:
     guests.append([n, "Holliday", "Family (Tier 1)", h, s, p, note])
@@ -191,6 +200,8 @@ for n, h, p, note in NEW:
     guests.append([n, "Holliday", "Friends (Tier 4)", h, 1, p, note])
 for n, h, p, note in EMMA_FRIENDS_NEW:
     guests.append([n, "Emma", "Friends", h, 1, p, note])
+for n, h, p, note in WEXLER_KIDS:
+    guests.append([n, "Holliday", "Framily (Tier 2)", h, 1, p, note])
 
 title_block(gl, "GUEST LIST", "Your full list, organized by side and tier. Adjust party sizes as +1s are confirmed.", len(GL_HEAD))
 header_row(gl, 3, GL_HEAD)
