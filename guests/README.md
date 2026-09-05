@@ -14,7 +14,7 @@ connector is attached), so this is a file to upload rather than an edit in place
 | Tab | Contents |
 |---|---|
 | Overview | Event details, guest summary, guests by group, budget snapshot, checklist progress — all formula-driven off the other tabs |
-| Guest List | 183 rows (109 original + 74 new), 18 columns, RSVP/`+1?` dropdowns |
+| Guest List | 180 rows, 18 columns, RSVP/`+1?` dropdowns |
 | Budget | 28 line items in 12 categories; Balance and TOTAL calculate themselves |
 | Vendors & Contacts | 16 vendor types; Balance = Quoted − Deposit |
 | Planning Checklist | 41 tasks, 12+ months out through After; Status dropdown |
@@ -26,13 +26,13 @@ Guest counts by group, reconciled against the PDF's Overview:
 |---|---|---:|---:|
 | Holliday | Family (Tier 1) | 10 | 19 |
 | Holliday | Framily (Tier 2) | 11 | 17 |
-| Holliday | Influences (Tier 3) | 7 | 12 |
+| Holliday | Influences (Tier 3) | 4 | 8 |
 | Holliday | Friends (Tier 4) — new, Matt's friends | 43 | 43 |
 | Emma | Family | 61 | 61 |
 | Emma | Parents' Friends | 24 | 24 |
 | Emma | Friends — new, Emma's friends | 25 | 25 |
 | Couple | Bride & Groom — new | 2 | 2 |
-| **TOTAL** | | **183** | **203** |
+| **TOTAL** | | **180** | **199** |
 
 The first three Holliday tiers and both Emma groups reconciled against the PDF's own
 Overview before anything was added (10/19, 7/13, 7/12, 61/61, 24/24), so the
@@ -45,8 +45,8 @@ silently counted.
 
 ## Other files
 
-- `new_guest_rows.csv` — just the 74 additions (rows 110-183), if you'd rather paste
-  rows into the existing sheet than replace it.
+- `new_guest_rows.csv` — just the 71 added rows (110-180), if you'd rather paste rows
+  into the existing sheet than replace it.
 - `olive_palette.md` — the olive hex values and where each is applied.
 - `build_workbook.py` — the generator, so any of this can be regenerated.
 
@@ -63,11 +63,11 @@ silently counted.
   so all five rows group together; that column feeds no totals, so no count moved.
 - **Emma and Matt** are rows 110-111 under a `Couple` side so they don't inflate
   either family's group counts. Delete both if the totals should mean invited guests.
-- **Not re-added — already present:** `David tardella and wife` is row 21
-  (*Dave Tardella & wife*); `brad Brett and wife` is row 22 (*Brad Bretz & wife*).
-  So `brad Brett` was read as one person, Brad Bretz.
-- **Wedding date** is set to **May 22, 2026**, which reproduces the PDF's
-  `Days Until Wedding = -106`. If the wedding is May 22, 2027, change Overview!B5.
+- **Rows renumbered sequentially** after the three deletions, so `#` has no gaps.
+  Everything above the old row 21 keeps its number; below it, numbers drop by three.
+  The four Notes that cite a row number were re-pointed to match.
+- **Wedding date** is **May 29, 2027** and the venue is **Berry**, both taken from
+  your edited copy.
 
 ## Carried over from the PDF, worth a check
 
@@ -79,17 +79,28 @@ silently counted.
 - Row 63 read as `Ansen` with `New baby` moved into Notes.
 - Row 76 printed as `(Brayden` with a stray parenthesis; entered as `Brayden`.
 
+## Merged back from your edited copy (Wedding_Planning_Workbook_2)
+
+- **Deleted:** *Dave Tardella & wife*, *Brad Bretz & wife* and *Network pastors (TBD)*
+  — Influences (Tier 3) drops from 7 parties/12 guests to 4/8.
+- **Renamed:** Andre → **Andie** · Anabelle → **Anabel** · Jackie → **Jackie Smith** ·
+  Brady Laubach → **Brad Laubach** · Garrett/Abby Thurmond → **Thurman** ·
+  the placeholder pair → **ZZZZ** and **Zs wife**.
+- **Wedding date** May 22, 2026 → **May 29, 2027**; **Venue** → **Berry**.
+- Budget, Vendors, Checklist and Seating carried no entries in your copy, so they are
+  unchanged.
+
 ## Possible duplicates worth a look
 
-- **Jackie Santander** (row 175) vs **Jackie** on row 91, an Emma parents' friend.
-- **Chris Santander** (row 176) vs **Chris** / **Chris' wife** on rows 101-102, also
+- **Jackie Santander** vs **Jackie Smith** on row 88, an Emma parents' friend.
+- **Chris Santander** vs **Chris** / **Chris' wife** on rows 98-99, also
   parents' friends with the wife's name still TBD — this could be the same couple.
-- **Garrett** (row 165, with Moriah) is treated as a different person from
-  **Garrett Thurmond** (row 116, with Abby).
-- **Michael** (row 161, with Alisa), **Michael Rumende** (row 151) and **Michael** on
-  row 36 are all entered as separate people.
-- **Rachel** (row 156), **Rachel Lane** (row 122), **Rachel Guy** (row 179) and
-  **Rachel** on row 94 are likewise all separate.
+- **Garrett** (with Moriah) is treated as a different person from **Garrett Thurman**
+  (with Abby).
+- **Michael** (with Alisa), **Michael Rumende** and **Michael** on row 33 are all
+  entered as separate people.
+- **Rachel** (with Nathaniel), **Rachel Lane**, **Rachel Guy** and **Rachel** on
+  row 91 are likewise all separate.
 
 ## Still to confirm in the new names (flagged inline in Notes)
 

@@ -85,28 +85,25 @@ T2 = [("Tom Rhodes","",2,"No",""), ("Kourtney & Andrew Wexler","Wexler",1,"No","
 T3 = [("Jim & Shelley Sexton","",2,"No","Just thoughts"),
       ("Steve & Jana Harmon","",2,"No","Just thoughts"),
       ("Jeff Johnson & wife","",2,"No","Spouse name TBD"),
-      ("Dave Tardella & wife","",2,"No","Spouse name TBD"),
-      ("Brad Bretz & wife","",2,"No","Spouse name TBD"),
-      ("Perko & Kristen","",2,"No",""),
-      ("Network pastors (TBD)","",None,"No","Placeholder - decide who to add")]
+      ("Perko & Kristen","",2,"No","")]
 
 EMMA_FAM = ["Will","Eve","Mia","Zoe","MaeMae","Mae Belle","Steve","Josh","Naomi","Elise",
             "Caleb","Michael","Clyde","Carly","Mathias","Rose","Wes","Katie","Brice","Marcus",
             "Ben","Catherine","Baby","Anna","Carrie","Dutch","Katherine","Jackson","Rebecca Mae",
             "Bear","Maggie","Kirkley","Margaret","Taylor","Crew","Wells","Elizabeth","Levi",
             "Ansen","Amy","Paul","Matthew","Lauren","Bellamy","Navy","Romie","Ashley","Bart",
-            "Joan","Anna","Nick","Brayden","Thatcher","Ali","Kenny","Andre","Baby 2","JB",
-            "Anabelle","Eli","Evie"]
+            "Joan","Anna","Nick","Brayden","Thatcher","Ali","Kenny","Andie","Baby 2","JB",
+            "Anabel","Eli","Evie"]
 EMMA_FAM_NOTES = {"Baby": "Name to confirm", "Ansen": "New baby - name to confirm",
                   "Brayden": "Name to confirm", "Baby 2": "Name to confirm"}
-EMMA_FRIENDS = ["Denise Moss","Mike","Becky Miller","Matt","Donna Smith","Jackie","Lauren Hight",
+EMMA_FRIENDS = ["Denise Moss","Mike","Becky Miller","Matt","Donna Smith","Jackie Smith","Lauren Hight",
                 "Krin Baer","Rachel","David Wilhite","Lauren W","Clark","Martha","Dick",
                 "Dick's wife","Chris","Chris' wife","Nikki Kintner","Pam Flowe","Anne Cundiff",
                 "Tim Cundiff","Jim Glover","Anne Herbert","Jack Herbert"]
 EMMA_FRIENDS_NOTES = {"Dick's wife": "Name to confirm", "Chris' wife": "Name to confirm"}
 
-NEW = [("Brady Laubach","Laubach","No",""), ("Shannon Laubach","Laubach","No",""),
-       ("Garrett Thurmond","Thurmond","No",""), ("Abby Thurmond","Thurmond","No",""),
+NEW = [("Brad Laubach","Laubach","No",""), ("Shannon Laubach","Laubach","No",""),
+       ("Garrett Thurman","Thurman","No",""), ("Abby Thurman","Thurman","No",""),
        ("Collier Jackson","Jackson","No",""), ("Claire Jackson","Jackson","No",""),
        ("Bronson Lane","Lane","No",""), ("Rachel Lane","Lane","No",""),
        ("Jay Joyner","Joyner (Jay)","No",""),
@@ -134,8 +131,8 @@ NEW = [("Brady Laubach","Laubach","No",""), ("Shannon Laubach","Laubach","No",""
        ("Momoka","Shun & Momoka","No","Last name to confirm"),
        ("David Wadijija","Wadijija","No","Spelling to confirm"),
        ("David Wadijija's +1","Wadijija","TBD","+1 to confirm"),
-       ("[Placeholder - name TBD]","Placeholder","No","Listed as 'ZZZZZZZ' - decide who to add"),
-       ("[Placeholder]'s +1","Placeholder","TBD","+1 to confirm"),
+       ("ZZZZ","Placeholder","No","Placeholder - decide who to add"),
+       ("Zs wife","Placeholder","TBD","+1 to confirm"),
        ("Michael Rumende","Rumende","No",""),
        ("Chitra","Rumende","No","Last name to confirm"),
        ("PD","PD","No","Full name to confirm"),
@@ -150,11 +147,11 @@ EMMA_FRIENDS_NEW = [
     ("Debbie", "Viet & Debbie", "No", "Last name to confirm"),
     ("Noah", "Noah & Emily", "No", "Last name to confirm"),
     ("Emily", "Noah & Emily", "No", "Last name to confirm"),
-    ("Michael", "Michael & Alisa", "No", "Last name to confirm - not Michael Rumende or Michael on row 36"),
+    ("Michael", "Michael & Alisa", "No", "Last name to confirm - not Michael Rumende or Michael on row 33"),
     ("Alisa", "Michael & Alisa", "No", "Last name to confirm"),
     ("Grant", "Grant & Samantha", "No", "Last name to confirm"),
     ("Samantha", "Grant & Samantha", "No", "Last name to confirm"),
-    ("Garrett", "Garrett & Moriah", "No", "Last name to confirm - not Garrett Thurmond"),
+    ("Garrett", "Garrett & Moriah", "No", "Last name to confirm - not Garrett Thurman"),
     ("Moriah", "Garrett & Moriah", "No", "Last name to confirm"),
     ("Madeleine Harris", "Harris", "No", ""),
     ("Bee Icayan", "Icayan", "No", ""),
@@ -164,8 +161,8 @@ EMMA_FRIENDS_NEW = [
     ("Megan Rogers", "Rogers", "No", ""),
     ("Norma Street", "Street", "No", ""),
     ("Jay Street", "Street", "No", ""),
-    ("Jackie Santander", "Santander", "No", "Possible overlap with Jackie on row 91 - check"),
-    ("Chris Santander", "Santander", "No", "Possible overlap with Chris / Chris' wife on rows 101-102 - check"),
+    ("Jackie Santander", "Santander", "No", "Possible overlap with Jackie Smith on row 88 - check"),
+    ("Chris Santander", "Santander", "No", "Possible overlap with Chris / Chris' wife on rows 98-99 - check"),
     ("Sheona", "Sheona & Issac", "No", "Last name to confirm"),
     ("Issac", "Sheona & Issac", "No", "Spelling to confirm - Issac or Isaac?"),
     ("Rachel Guy", "Guy", "No", ""),
@@ -278,11 +275,10 @@ def kv(ws, row, label, value, fmt=None, shade=True):
 
 G = f"'Guest List'!"
 section(ov, 4, "EVENT DETAILS")
-kv(ov, 5, "Wedding Date", date(2026, 5, 22), "mmmm d, yyyy")
-kv(ov, 6, "Venue", "", None, False)
+kv(ov, 5, "Wedding Date", date(2027, 5, 29), "mmmm d, yyyy")
+kv(ov, 6, "Venue", "Berry \U0001F64F", None, False)
 kv(ov, 7, "Total Budget Goal", 25000, MONEY)
 kv(ov, 8, "Days Until Wedding", "=B5-TODAY()", "0", False)
-ov.cell(row=8, column=3, value="Negative = the date has passed; update B5 if the year is wrong").font = Font(color=MID, size=9, italic=True)
 
 section(ov, 10, "GUEST SUMMARY")
 kv(ov, 11, "Total Invited Parties", f"=COUNTA({G}B4:B{GL_LAST})")
