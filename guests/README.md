@@ -14,7 +14,7 @@ connector is attached), so this is a file to upload rather than an edit in place
 | Tab | Contents |
 |---|---|
 | Overview | Event details, guest summary, guests by group, budget snapshot, checklist progress — all formula-driven off the other tabs |
-| Guest List | 180 rows, 18 columns, RSVP/`+1?` dropdowns |
+| Guest List | 198 rows - one person per row, every party size 1 |
 | Budget | 28 line items in 12 categories; Balance and TOTAL calculate themselves |
 | Vendors & Contacts | 16 vendor types; Balance = Quoted − Deposit |
 | Planning Checklist | 41 tasks, 12+ months out through After; Status dropdown |
@@ -22,17 +22,17 @@ connector is attached), so this is a file to upload rather than an edit in place
 
 Guest counts by group, reconciled against the PDF's Overview:
 
-| Side | Category | Parties | Guests |
-|---|---|---:|---:|
-| Holliday | Family (Tier 1) | 10 | 19 |
-| Holliday | Framily (Tier 2) | 11 | 17 |
-| Holliday | Influences (Tier 3) | 4 | 8 |
-| Holliday | Friends (Tier 4) — new, Matt's friends | 43 | 43 |
-| Emma | Family | 61 | 61 |
-| Emma | Parents' Friends | 24 | 24 |
-| Emma | Friends — new, Emma's friends | 25 | 25 |
-| Couple | Bride & Groom — new | 2 | 2 |
-| **TOTAL** | | **180** | **199** |
+| Side | Category | Guests |
+|---|---|---:|
+| Holliday | Family (Tier 1) | 19 |
+| Holliday | Framily (Tier 2) | 18 |
+| Holliday | Influences (Tier 3) | 8 |
+| Holliday | Friends (Tier 4) — Matt's friends | 45 |
+| Emma | Family | 61 |
+| Emma | Parents' Friends | 24 |
+| Emma | Friends — Emma's friends | 21 |
+| Couple | Bride & Groom | 2 |
+| **TOTAL** | | **198** |
 
 The first three Holliday tiers and both Emma groups reconciled against the PDF's own
 Overview before anything was added (10/19, 7/13, 7/12, 61/61, 24/24), so the
@@ -45,8 +45,9 @@ silently counted.
 
 ## Other files
 
-- `new_guest_rows.csv` — just the 71 added rows (110-180), if you'd rather paste rows
-  into the existing sheet than replace it.
+- `guest_list_source.tsv` — **the guest list itself**. Edit this and re-run
+  `build_workbook.py`; the workbook is generated from it.
+- `new_guest_rows.csv` — the full 198-row list as CSV, for pasting.
 - `olive_palette.md` — the olive hex values and where each is applied.
 - `build_workbook.py` — the generator, so any of this can be regenerated.
 
@@ -79,7 +80,25 @@ silently counted.
 - Row 63 read as `Ansen` with `New baby` moved into Notes.
 - Row 76 printed as `(Brayden` with a stray parenthesis; entered as `Brayden`.
 
-## Merged back from your edited copy (Wedding_Planning_Workbook_2)
+## This round
+
+- **One person per row.** Every party of 2 was split, so `Party Size` is 1
+  everywhere and parties = guests = 198. Couples stay adjacent via
+  `Household / Group` (Mom and Dad both sit in `Holliday - Immediate`, the Sextons
+  in `Sexton`, and so on).
+- **Rows carrying an unnamed partner** became `<Name>'s +1` or `<Name>'s guest`
+  with `Name to confirm` — Lemon, Taylor, Cody, Kendal, Nathan and Tom Rhodes.
+- **Kourtney & Andrew Wexler** was one row with `Party Size` 1 despite naming two
+  people. Split into two rows, which raises the count by one.
+- **Jim and Shelley Sexton** are separate rows and no longer carry the
+  `Just thoughts` note; Steve & Jana Harmon still do.
+- **Added:** Maddy & Jordan Alessi, Ethan & Meredith Rivers, and Mina & her husband,
+  all under `Holliday / Friends (Tier 4)`. Mina's pair and Rocky's are marked
+  **Honorary invite**.
+- **Notes no longer cite row numbers**, since splitting renumbers everything. They
+  name the person and group instead.
+
+## Merged earlier from your edited copy (Wedding_Planning_Workbook_2)
 
 - **Deleted:** *Dave Tardella & wife*, *Brad Bretz & wife* and *Network pastors (TBD)*
   — Influences (Tier 3) drops from 7 parties/12 guests to 4/8.
