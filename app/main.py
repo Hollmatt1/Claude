@@ -12,12 +12,15 @@ import traceback
 import uuid
 from pathlib import Path
 
+import numpy as np
+
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from . import analyze as A
 from . import pose, render
+from . import session as S
 
 DATA = Path(os.environ.get("DATA_DIR", "./data")) / "swings"
 DATA.mkdir(parents=True, exist_ok=True)
@@ -25,6 +28,8 @@ STATIC = Path(__file__).parent / "static"
 APP_USER = os.environ.get("APP_USER", "golf")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
 MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "600"))
+SESSION_MIN_S = float(os.environ.get("SESSION_MIN_SECONDS", "25"))   # longer uploads are range sessions
+SESSION_SWING_FPS = float(os.environ.get("SESSION_SWING_FPS", "60"))  # analysis frame rate per session swing
 MEDIA_NAMES = {"annotated.mp4"} | {f"{p}.jpg" for p in A.PHASES}
 
 security = HTTPBasic(auto_error=False)
@@ -78,10 +83,48 @@ def all_metas() -> list[dict]:
 
 def _summary(m: dict) -> dict:
     r = m.get("result") or {}
-    return {k: m.get(k) for k in ("id", "created", "status", "label", "note", "is_reference", "error")} | {
+    out = {k: m.get(k) for k in ("id", "created", "status", "label", "note", "is_reference", "error", "kind",
+                                 "index", "peak", "stage", "progress")} | {
         "view": r.get("view") or m.get("view_hint"), "counts": r.get("counts"),
         "thumb": f"/media/{m['id']}/address.jpg" if m.get("status") == "done" else None,
     }
+    if m.get("kind") == "session":
+        kids = [k for k in (_try_meta(c) for c in m.get("children", [])) if k]
+        done = [k for k in kids if k["status"] == "done"]
+        out |= {"swings_found": len(m.get("windows") or []), "swings_done": len(done),
+                "thumb": f"/media/{done[0]['id']}/address.jpg" if done else None,
+                "view": (done[0]["result"]["view"] if done else m.get("view_hint"))}
+    return out
+
+
+def _try_meta(sid: str) -> dict | None:
+    try:
+        return load_meta(sid)
+    except HTTPException:
+        return None
+
+
+def session_report(m: dict) -> dict:
+    """Every swing in a session plus how often each check came out good / check / bad."""
+    kids = [k for k in (_try_meta(c) for c in m.get("children", [])) if k]
+    agg: dict[str, dict] = {}
+    for k in kids:
+        if k["status"] != "done":
+            continue
+        for c in k["result"]["checks"]:
+            a = agg.setdefault(c["id"], {"id": c["id"], "title": c["title"], "good": 0, "warn": 0, "bad": 0,
+                                         "values": [], "tip": None})
+            a[c["status"]] += 1
+            if c.get("value") is not None:
+                a["values"].append(c["value"])
+            if c["status"] != "good" and c.get("tip") and not a["tip"]:
+                a["tip"] = c["tip"]
+    rows = sorted(agg.values(), key=lambda a: (-(a["bad"] * 2 + a["warn"]), a["title"]))
+    for a in rows:
+        v = a.pop("values")
+        a["median"] = round(float(np.median(v)), 2) if v else None
+        a["n"] = a["good"] + a["warn"] + a["bad"]
+    return {"swings": [_summary(k) for k in sorted(kids, key=lambda k: k.get("index", 0))], "checks": rows}
 
 
 # ------------------------------------------------------------- worker
@@ -91,6 +134,8 @@ jobs: "queue.Queue[str]" = queue.Queue()
 
 def process(sid: str):
     meta = load_meta(sid)
+    if meta.get("kind") == "session":
+        return process_session(meta)
     d = _dir(sid)
     meta.update(status="processing", progress=0.0)
     save_meta(meta)
@@ -103,7 +148,8 @@ def process(sid: str):
             save_meta(meta)
 
     try:
-        data = pose.extract(str(d / meta["input"]), progress=progress)
+        fps = SESSION_SWING_FPS if meta.get("session_id") else None
+        data = pose.extract(str(d / meta["input"]), progress=progress, target_fps=fps)
         result = A.analyze(data["landmarks"], data["times"], view=meta.get("view_hint", "auto"))
         meta["progress"] = 0.85
         save_meta(meta)
@@ -124,7 +170,73 @@ def process(sid: str):
     save_meta(meta)
 
 
+def process_session(meta: dict):
+    """Find every swing in a long video, cut each into its own swing entry, analyze them in order."""
+    d = _dir(meta["id"])
+    src = str(d / meta["input"])
+    meta.update(status="processing")
+    try:
+        info = meta.get("info") or S.probe(src)
+        meta["info"] = info
+        if meta.get("windows") is None:
+            meta.update(stage="Finding swings", progress=0.0)
+            save_meta(meta)
+            last = [0.0]
+
+            def scan_progress(frac):
+                if time.time() - last[0] > 2:
+                    last[0] = time.time()
+                    meta["progress"] = round(frac * 0.3, 3)
+                    save_meta(meta)
+
+            lm, t = S.scan(src, info, progress=scan_progress)
+            meta["windows"] = S.find_swings(lm, t, info["duration"])
+            meta["children"] = []
+            save_meta(meta)
+        wins = meta["windows"]
+        if not wins:
+            raise A.AnalysisError("No full swings found. The whole body needs to stay in frame, "
+                                  "and chips and putts aren't counted.")
+        for i, w in enumerate(wins):
+            meta.update(stage=f"Analyzing swing {i + 1} of {len(wins)}", progress=round(0.3 + 0.7 * i / len(wins), 3))
+            save_meta(meta)
+            cid = f"{meta['id']}s{i + 1:03d}"
+            if cid in meta["children"] and _try_meta(cid) and load_meta(cid)["status"] in ("done", "error"):
+                continue
+            cd = DATA / cid
+            if cd.exists():
+                shutil.rmtree(cd)
+            cd.mkdir(parents=True)
+            S.cut(src, w["start"], w["end"], str(cd / "input.mp4"), info)
+            base = meta.get("label") or "Swing"
+            child = {"id": cid, "created": meta["created"] + i * 0.001, "status": "queued", "progress": 0.0,
+                     "input": "input.mp4", "filename": meta.get("filename"), "view_hint": meta.get("view_hint", "auto"),
+                     "label": f"{base} #{i + 1}", "note": "", "is_reference": bool(meta.get("is_reference")),
+                     "session_id": meta["id"], "index": i + 1, "peak": w["peak"]}
+            save_meta(child)
+            if cid not in meta["children"]:
+                meta["children"].append(cid)
+                save_meta(meta)
+            process(cid)
+        kids = [_try_meta(c) for c in meta["children"]]
+        ok = sum(1 for k in kids if k and k["status"] == "done")
+        meta.update(status="done", progress=1.0, stage=f"{ok} of {len(wins)} swings analyzed")
+        if os.environ.get("KEEP_ORIGINALS", "0") != "1":
+            (d / meta["input"]).unlink(missing_ok=True)
+            meta["input_deleted"] = True
+    except A.AnalysisError as e:
+        meta.update(status="error", error=str(e))
+    except Exception as e:  # noqa: BLE001
+        traceback.print_exc()
+        meta.update(status="error", error=f"Processing failed: {e}")
+    save_meta(meta)
+
+
 def worker():
+    try:
+        os.nice(10)  # this thread only: Minecraft on the same box keeps priority
+    except OSError:
+        pass
     while True:
         sid = jobs.get()
         try:
@@ -136,7 +248,7 @@ def worker():
 @app.on_event("startup")
 def start_worker():
     for m in sorted(all_metas(), key=lambda m: m["created"]):
-        if m["status"] in ("queued", "processing"):
+        if m["status"] in ("queued", "processing") and not m.get("session_id"):
             jobs.put(m["id"])
     threading.Thread(target=worker, daemon=True).start()
 
@@ -165,11 +277,17 @@ def upload(file: UploadFile = File(...), view: str = Form("auto"), label: str = 
             if size > limit:
                 f.close()
                 shutil.rmtree(d)
-                raise HTTPException(413, f"Video is over {MAX_UPLOAD_MB} MB. Trim it to just the swing.")
+                raise HTTPException(413, f"Video is over {MAX_UPLOAD_MB} MB.")
             f.write(chunk)
     meta = {"id": sid, "created": time.time(), "status": "queued", "progress": 0.0, "input": dest.name,
             "filename": file.filename, "view_hint": view, "label": label.strip()[:80],
             "note": note.strip()[:500], "is_reference": bool(is_reference)}
+    try:
+        info = S.probe(str(dest))
+    except Exception:  # noqa: BLE001
+        info = None
+    if info and info["duration"] > SESSION_MIN_S:
+        meta.update(kind="session", info=info)
     save_meta(meta)
     jobs.put(sid)
     return {"id": sid}
@@ -177,15 +295,21 @@ def upload(file: UploadFile = File(...), view: str = Form("auto"), label: str = 
 
 @app.get("/api/swings")
 def list_swings():
-    return [_summary(m) for m in all_metas()]
+    return [_summary(m) for m in all_metas() if not m.get("session_id")]
 
 
 @app.get("/api/swings/{sid}")
 def get_swing(sid: str, ref: str | None = None):
     m = load_meta(sid)
     m.pop("input", None)
+    if m.get("kind") == "session":
+        return m | session_report(m)
+    if m.get("session_id"):
+        parent = _try_meta(m["session_id"])
+        m["session_label"] = (parent or {}).get("label") or "Session"
+        m["session_size"] = len((parent or {}).get("children") or [])
     if m.get("status") == "done":
-        refs = [r for r in all_metas() if r.get("is_reference") and r["status"] == "done"
+        refs = [r for r in all_metas() if r.get("is_reference") and r["status"] == "done" and r.get("result")
                 and r["id"] != sid and r["result"]["view"] == m["result"]["view"]]
         m["available_refs"] = [{"id": r["id"], "label": r.get("label") or "Reference"} for r in refs]
         chosen = next((r for r in refs if r["id"] == ref), None) if ref else (refs[0] if refs else None)
@@ -210,7 +334,15 @@ def update_swing(sid: str, body: dict):
 
 @app.delete("/api/swings/{sid}")
 def delete_swing(sid: str):
-    load_meta(sid)
+    m = load_meta(sid)
+    for c in m.get("children") or []:
+        if (DATA / c).is_dir() and c.isalnum():
+            shutil.rmtree(DATA / c)
+    if m.get("session_id"):
+        parent = _try_meta(m["session_id"])
+        if parent and sid in parent.get("children", []):
+            parent["children"].remove(sid)
+            save_meta(parent)
     shutil.rmtree(_dir(sid))
     return {"ok": True}
 

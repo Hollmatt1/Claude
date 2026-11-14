@@ -13,7 +13,7 @@ MAX_SECONDS = 20       # ignore anything after this
 DETECT_LONG_SIDE = 960  # resize frames to this before running pose
 
 
-def video_info(path: str) -> dict:
+def video_info(path: str, target_fps: float | None = None) -> dict:
     cap = cv2.VideoCapture(path)
     if not cap.isOpened():
         raise ValueError("Could not open video")
@@ -22,7 +22,7 @@ def video_info(path: str) -> dict:
         fps = 30.0
     count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
     cap.release()
-    stride = max(1, round(fps / TARGET_FPS))
+    stride = max(1, round(fps / (target_fps or TARGET_FPS)))
     return {"fps": float(fps), "frame_count": count, "stride": stride}
 
 
@@ -69,9 +69,9 @@ def _mediapipe_detector():
 
 
 def extract(path: str, progress: Callable[[float], None] | None = None,
-            detector_factory: Callable = _mediapipe_detector) -> dict:
+            detector_factory: Callable = _mediapipe_detector, target_fps: float | None = None) -> dict:
     """Return landmarks (N,33,4) in source-pixel coordinates, times (N,), and video info."""
-    info = video_info(path)
+    info = video_info(path, target_fps)
     fps, stride = info["fps"], info["stride"]
     total = info["frame_count"] or 1
     detect = detector_factory()
