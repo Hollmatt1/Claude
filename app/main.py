@@ -10,6 +10,7 @@ import threading
 import time
 import traceback
 import uuid
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -297,11 +298,28 @@ def upload(file: UploadFile = File(...), view: str = Form("auto"), label: str = 
             if size > limit:
                 f.close()
                 shutil.rmtree(d)
-                raise HTTPException(413, f"Video is over {MAX_UPLOAD_MB} MB.")
+                raise HTTPException(413, f"Upload is over {MAX_UPLOAD_MB} MB.")
             f.write(chunk)
-    meta = {"id": sid, "created": time.time(), "status": "queued", "progress": 0.0, "input": dest.name,
-            "filename": file.filename, "view_hint": view, "label": label.strip()[:80],
-            "note": note.strip()[:500], "is_reference": bool(is_reference)}
+    common = {"view_hint": view, "note": note.strip()[:500], "is_reference": bool(is_reference)}
+    if zipfile.is_zipfile(dest):
+        try:
+            ids = _unzip_videos(dest, label.strip()[:80], common)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+        if not ids:
+            raise HTTPException(400, "The zip file has no videos in it.")
+        return {"id": ids[0], "ids": ids}
+    _register(sid, dest, file.filename, label.strip()[:80], common)
+    return {"id": sid, "ids": [sid]}
+
+
+VIDEO_EXTS = {".mov", ".mp4", ".m4v", ".avi", ".mkv", ".3gp", ".webm"}
+
+
+def _register(sid: str, dest: Path, filename: str | None, label: str, common: dict, created: float | None = None):
+    """Write the metadata for an uploaded video (a session if it's long) and queue it."""
+    meta = {"id": sid, "created": created or time.time(), "status": "queued", "progress": 0.0, "input": dest.name,
+            "filename": filename, "label": label} | common
     try:
         info = S.probe(str(dest))
     except Exception:  # noqa: BLE001
@@ -310,7 +328,32 @@ def upload(file: UploadFile = File(...), view: str = Form("auto"), label: str = 
         meta.update(kind="session", info=info)
     save_meta(meta)
     jobs.put(sid)
-    return {"id": sid}
+
+
+def _unzip_videos(zpath: Path, label: str, common: dict) -> list[str]:
+    """Each video inside the zip becomes its own upload. Folder paths inside the zip are ignored (only the
+    file name is used), other files are skipped, and the unpacked total is capped at the upload limit."""
+    ids, total, limit = [], 0, MAX_UPLOAD_MB * 1024 * 1024
+    with zipfile.ZipFile(zpath) as z:
+        members = sorted((i for i in z.infolist() if not i.is_dir()), key=lambda i: i.filename)
+        vids = [i for i in members if Path(i.filename).suffix.lower() in VIDEO_EXTS
+                and not Path(i.filename).name.startswith(".") and "__MACOSX" not in i.filename]
+        now = time.time()
+        for n, info in enumerate(vids):
+            total += info.file_size
+            if total > limit:
+                break
+            sid = uuid.uuid4().hex[:12]
+            d = DATA / sid
+            d.mkdir(parents=True)
+            name = Path(info.filename).name
+            dest = d / f"input{Path(name).suffix.lower()}"
+            with z.open(info) as src, dest.open("wb") as out:
+                shutil.copyfileobj(src, out, 1024 * 1024)
+            lab = f"{label} · video {n + 1}" if label and len(vids) > 1 else (label or Path(name).stem)
+            _register(sid, dest, name, lab, common, created=now + n * 0.001)
+            ids.append(sid)
+    return ids
 
 
 @app.get("/api/swings")
