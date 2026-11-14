@@ -94,8 +94,8 @@ async function showHome() {
   app.innerHTML = `
   <h1>SwingCheck</h1>
   <div class="card">
-    <label class="file" id="drop"><input type="file" id="f" accept="video/*">
-      <div id="fname">Tap to choose a video: one swing or a whole range session</div></label>
+    <label class="file" id="drop"><input type="file" id="f" accept="video/*" multiple>
+      <div id="fname">Tap to choose videos: single swings or whole range sessions (you can pick several)</div></label>
     <label>Camera angle</label>
     <select id="view">
       <option value="auto">Detect automatically</option>
@@ -121,7 +121,9 @@ async function showHome() {
   <h2>Swings</h2><div id="list" class="muted">Loading…</div>`;
   $("#view").value = store.get("view", "auto");
   $("#view").onchange = e => store.set("view", e.target.value);
-  $("#f").onchange = e => { const f = e.target.files[0]; $("#fname").textContent = f ? `${f.name} · ${(f.size/1e6).toFixed(0)} MB` : ""; $("#go").disabled = !f; };
+  $("#f").onchange = e => { const fs = [...e.target.files], mb = fs.reduce((a, f) => a + f.size, 0) / 1e6;
+    $("#fname").textContent = fs.length > 1 ? `${fs.length} videos · ${mb.toFixed(0)} MB` : fs.length ? `${fs[0].name} · ${mb.toFixed(0)} MB` : "";
+    $("#go").disabled = !fs.length; };
   $("#go").onclick = upload;
   try {
     const items = await api("/api/swings");
@@ -137,22 +139,38 @@ async function showHome() {
   } catch (e) { $("#list").textContent = e.message; }
 }
 
-function upload() {
-  const f = $("#f").files[0]; if (!f) return;
-  const fd = new FormData();
-  fd.append("file", f); fd.append("view", $("#view").value);
-  fd.append("label", $("#label").value); fd.append("is_reference", $("#isref").checked);
-  const xhr = new XMLHttpRequest();
-  $("#go").disabled = true; $("#bar").hidden = false; $("#msg").textContent = "Uploading…";
-  xhr.upload.onprogress = e => { if (e.lengthComputable) { $("#bar div").style.width = (100*e.loaded/e.total) + "%";
-    $("#msg").textContent = `Uploading… ${(e.loaded/1e6).toFixed(0)} of ${(e.total/1e6).toFixed(0)} MB. Keep this page open.`; } };
-  xhr.onload = () => {
-    if (xhr.status === 200) location.hash = `#/s/${JSON.parse(xhr.responseText).id}`;
-    else { let d; try { d = JSON.parse(xhr.responseText || "{}").detail; } catch {}
-      $("#msg").textContent = d || `Upload failed (error ${xhr.status}). Try again.`; $("#go").disabled = false; }
-  };
-  xhr.onerror = () => { $("#msg").textContent = "Upload failed. Check your connection."; $("#go").disabled = false; };
-  xhr.open("POST", "/api/swings"); xhr.send(fd);
+function sendOne(f, label, n, total) {
+  return new Promise((resolve, reject) => {
+    const fd = new FormData();
+    fd.append("file", f); fd.append("view", $("#view").value);
+    fd.append("label", label); fd.append("is_reference", $("#isref").checked);
+    const xhr = new XMLHttpRequest();
+    const pre = total > 1 ? `Video ${n} of ${total}: ` : "";
+    xhr.upload.onprogress = e => { if (e.lengthComputable) { $("#bar div").style.width = (100*e.loaded/e.total) + "%";
+      $("#msg").textContent = `${pre}uploading… ${(e.loaded/1e6).toFixed(0)} of ${(e.total/1e6).toFixed(0)} MB. Keep this page open.`; } };
+    xhr.onload = () => {
+      if (xhr.status === 200) return resolve(JSON.parse(xhr.responseText).id);
+      let d; try { d = JSON.parse(xhr.responseText || "{}").detail; } catch {}
+      reject(new Error(`${pre}${d || `upload failed (error ${xhr.status})`}`));
+    };
+    xhr.onerror = () => reject(new Error(`${pre}upload failed. Check your connection.`));
+    xhr.open("POST", "/api/swings"); xhr.send(fd);
+  });
+}
+
+async function upload() {
+  const files = [...$("#f").files]; if (!files.length) return;
+  const base = $("#label").value.trim();
+  $("#go").disabled = true; $("#bar").hidden = false;
+  let last = null, failed = [];
+  for (let i = 0; i < files.length; i++) {
+    const label = files.length > 1 && base ? `${base} · video ${i + 1}` : base;
+    try { last = await sendOne(files[i], label, i + 1, files.length); }
+    catch (e) { failed.push(e.message); }
+  }
+  if (failed.length) { $("#msg").textContent = failed.join(" "); $("#go").disabled = false; return; }
+  location.hash = files.length > 1 ? "#/" : `#/s/${last}`;
+  if (files.length > 1) route();
 }
 
 async function showSwing(id, ref) {
@@ -179,7 +197,7 @@ async function showSwing(id, ref) {
   const pri = r.checks.find(c => c.id === r.top_priority);
   const cmp = s.comparison;
   app.innerHTML = `${head}
-    <div class="muted" style="margin-bottom:8px">${s.is_reference ? '<span class="pill ref">Reference</span>' : ""}<span class="pill">${VIEW[r.view]}</span>
+    <div class="muted" style="margin-bottom:8px">${s.practice ? '<span class="pill">Practice</span>' : ""}${s.is_reference ? '<span class="pill ref">Reference</span>' : ""}<span class="pill">${VIEW[r.view]}</span>
       ${new Date(s.created*1000).toLocaleString()} ${s.label ? "· " + esc(s.label) : ""}</div>
     ${r.tracking && r.tracking.grade === "poor" ? `<div class="card chk bad" style="margin-bottom:10px">Tracking was poor on this swing (${r.tracking.repaired_pct}% of frames needed repair), so treat these numbers with caution.</div>` : ""}
     <video src="/media/${id}/${v.video}" controls playsinline muted loop preload="metadata"></video>
@@ -208,6 +226,7 @@ async function showSwing(id, ref) {
     <div class="card">
       <label>Label</label><input type="text" id="lab" value="${esc(s.label)}">
       <label>Notes</label><input type="text" id="note" value="${esc(s.note)}" placeholder="e.g. felt good, pulled it left">
+      ${s.session_id ? `<label class="check"><input type="checkbox" id="prac" ${s.practice ? "checked" : ""}> Practice swing (left out of the session summary)</label>` : ""}
       <label class="check"><input type="checkbox" id="isref" ${s.is_reference ? "checked" : ""}> Use as a reference swing for comparisons</label>
       <div class="row" style="margin-top:12px"><button class="ghost" id="save">Save</button><button class="ghost" id="del" style="margin-left:auto">Delete swing</button></div>
       <div class="muted" style="margin-top:10px">Tempo ${r.metrics.tempo_ratio}:1 · analysed at ${r.fps_effective} fps · ${r.metrics.handedness_guess}-handed (detected)${r.tracking ? ` · arm tracking repaired in ${r.tracking.repaired_pct}% of frames (${r.tracking.grade})` : ""}</div>
@@ -215,7 +234,8 @@ async function showSwing(id, ref) {
   if ($("#refsel")) $("#refsel").onchange = e => location.hash = `#/s/${id}?ref=${e.target.value}`;
   $("#save").onclick = async () => {
     await api(`/api/swings/${id}`, { method: "PATCH", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ label: $("#lab").value, note: $("#note").value, is_reference: $("#isref").checked }) });
+      body: JSON.stringify({ label: $("#lab").value, note: $("#note").value, is_reference: $("#isref").checked,
+                             ...($("#prac") ? { practice: $("#prac").checked } : {}) }) });
     $("#save").textContent = "Saved"; setTimeout(() => $("#save") && ($("#save").textContent = "Save"), 1500);
   };
   $("#del").onclick = () => del(id);
@@ -235,8 +255,8 @@ function showSession(s, id) {
       <div class="muted" style="margin-top:8px">Finding swings takes about a minute per 5 minutes of video, then about 20–40 s per swing.
       Swings show up below as they finish. You can close this page and come back.</div></div>` : ""}
     ${s.status === "error" ? `<div class="card chk bad"><b>Couldn't analyze this video</b><p>${esc(s.error)}</p></div>` : ""}
-    ${s.poor_tracking ? `<div class="muted" style="margin:8px 0">${s.poor_tracking} swing${s.poor_tracking > 1 ? "s" : ""} with poor tracking ${s.poor_tracking > 1 ? "are" : "is"} left out of the summary.</div>` : ""}
-    ${done.length ? `<h2>What to work on (${done.length - (s.poor_tracking || 0)} swings)</h2>
+    ${s.poor_tracking || s.practice ? `<div class="muted" style="margin:8px 0">Left out of the summary: ${[s.practice ? `${s.practice} practice swing${s.practice > 1 ? "s" : ""} (another swing followed within 10 s; change it on the swing's page)` : "", s.poor_tracking ? `${s.poor_tracking} with poor tracking` : ""].filter(Boolean).join(", ")}.</div>` : ""}
+    ${done.length ? `<h2>What to work on (${done.length - (s.poor_tracking || 0) - (s.practice || 0)} swings)</h2>
       ${top.length ? top.map((c, i) => `<div class="card ${i === 0 ? "priority" : ""}"><div style="font-weight:700">${esc(c.title)}</div>
         <div class="val">Flagged in ${c.bad + c.warn} of ${c.n} swings${c.bad ? ` (${c.bad} bad)` : ""}</div>${c.tip ? `<div class="tip">${esc(c.tip)}</div>` : ""}</div>`).join("")
         : `<div class="card"><b>No faults detected in what this camera angle can measure.</b></div>`}
@@ -248,7 +268,7 @@ function showSession(s, id) {
       <a class="card hist" href="#/s/${x.id}">
         ${x.thumb ? `<img src="${x.thumb}" loading="lazy">` : `<div class="ph"></div>`}
         <div style="flex:1;min-width:0"><div class="t">#${x.index} <span class="muted">at ${fmt(x.peak || 0)}</span></div>
-        <div class="muted">${x.status === "done" ? trackPill(x.tracking) + dots(x.counts) : x.status === "error" ? "Skipped: " + esc(x.error || "") : esc(x.status)}</div></div></a>`).join("")
+        <div class="muted">${x.status === "done" ? (x.practice ? '<span class="pill">Practice</span>' : "") + trackPill(x.tracking) + dots(x.counts) : x.status === "error" ? "Skipped: " + esc(x.error || "") : esc(x.status)}</div></div></a>`).join("")
       : `<div class="muted">${busy ? "None yet." : "None."}</div>`}
     <div class="card" style="margin-top:16px">
       <label>Label</label><input type="text" id="lab" value="${esc(s.label)}">

@@ -84,7 +84,7 @@ def all_metas() -> list[dict]:
 def _summary(m: dict) -> dict:
     r = m.get("result") or {}
     out = {k: m.get(k) for k in ("id", "created", "status", "label", "note", "is_reference", "error", "kind",
-                                 "index", "peak", "stage", "progress")} | {
+                                 "index", "peak", "stage", "progress", "practice")} | {
         "view": r.get("view") or m.get("view_hint"), "counts": r.get("counts"), "tracking": r.get("tracking"),
         "thumb": f"/media/{m['id']}/address.jpg" if m.get("status") == "done" else None,
     }
@@ -104,12 +104,28 @@ def _try_meta(sid: str) -> dict | None:
         return None
 
 
+PRACTICE_GAP_S = 10.0  # a swing followed by another this soon is probably a practice swing
+
+
+def mark_practice(kids: list[dict]) -> None:
+    """Set k["practice"]: the user's choice if they made one, else True when another swing follows within
+    PRACTICE_GAP_S (people rehearse, then hit)."""
+    kids = sorted(kids, key=lambda k: k.get("peak") or 0)
+    for i, k in enumerate(kids):
+        if k.get("practice_set") is not None:
+            k["practice"] = bool(k["practice_set"])
+            continue
+        nxt = kids[i + 1].get("peak") if i + 1 < len(kids) else None
+        k["practice"] = nxt is not None and (nxt - (k.get("peak") or 0)) < PRACTICE_GAP_S
+
+
 def session_report(m: dict) -> dict:
     """Every swing in a session plus how often each check came out good / check / bad."""
     kids = [k for k in (_try_meta(c) for c in m.get("children", [])) if k]
+    mark_practice(kids)
     agg: dict[str, dict] = {}
     for k in kids:
-        if k["status"] != "done" or (k["result"].get("tracking") or {}).get("grade") == "poor":
+        if k["status"] != "done" or k["practice"] or (k["result"].get("tracking") or {}).get("grade") == "poor":
             continue
         for c in k["result"]["checks"]:
             a = agg.setdefault(c["id"], {"id": c["id"], "title": c["title"], "good": 0, "warn": 0, "bad": 0,
@@ -124,9 +140,11 @@ def session_report(m: dict) -> dict:
         v = a.pop("values")
         a["median"] = round(float(np.median(v)), 2) if v else None
         a["n"] = a["good"] + a["warn"] + a["bad"]
-    poor = sum(1 for k in kids if k["status"] == "done" and (k["result"].get("tracking") or {}).get("grade") == "poor")
+    poor = sum(1 for k in kids if k["status"] == "done" and not k["practice"]
+               and (k["result"].get("tracking") or {}).get("grade") == "poor")
+    practice = sum(1 for k in kids if k["status"] == "done" and k["practice"])
     return {"swings": [_summary(k) for k in sorted(kids, key=lambda k: k.get("index", 0))], "checks": rows,
-            "poor_tracking": poor, "can_reanalyze": not m.get("input_deleted") and (_dir(m["id"]) / m["input"]).exists()}
+            "poor_tracking": poor, "practice": practice, "can_reanalyze": not m.get("input_deleted") and (_dir(m["id"]) / m["input"]).exists()}
 
 
 # ------------------------------------------------------------- worker
@@ -310,6 +328,9 @@ def get_swing(sid: str, ref: str | None = None):
         parent = _try_meta(m["session_id"])
         m["session_label"] = (parent or {}).get("label") or "Session"
         m["session_size"] = len((parent or {}).get("children") or [])
+        sibs = [k for k in (_try_meta(c) for c in (parent or {}).get("children", [])) if k]
+        mark_practice(sibs)
+        m["practice"] = next((k["practice"] for k in sibs if k["id"] == sid), False)
     if m.get("status") == "done":
         refs = [r for r in all_metas() if r.get("is_reference") and r["status"] == "done" and r.get("result")
                 and r["id"] != sid and r["result"]["view"] == m["result"]["view"]]
@@ -330,6 +351,8 @@ def update_swing(sid: str, body: dict):
             m[k] = str(body[k])[:500]
     if "is_reference" in body:
         m["is_reference"] = bool(body["is_reference"])
+    if "practice" in body and m.get("session_id"):
+        m["practice_set"] = None if body["practice"] is None else bool(body["practice"])
     save_meta(m)
     return _summary(m)
 
