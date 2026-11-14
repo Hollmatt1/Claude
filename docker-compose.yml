@@ -1,0 +1,10 @@
+services:
+  swingcheck:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${BIND:-127.0.0.1}:8077:8000"   # BIND=0.0.0.0 in .env exposes it on the server IP
+    env_file: .env
+    volumes:
+      - ./data:/data
+    mem_limit: 1500m

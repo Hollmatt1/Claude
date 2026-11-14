@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f1512">
+<title>SwingCheck</title>
+<style>
+  :root { --bg:#0f1512; --card:#18211c; --line:#26332b; --text:#e8efe9; --dim:#93a399;
+          --good:#4cc38a; --warn:#e8b33c; --bad:#ec5d5d; --accent:#7fd1a8; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  main { max-width:760px; margin:0 auto; padding:16px; }
+  h1 { font-size:22px; margin:4px 0 16px; letter-spacing:-.01em; }
+  h1 a { color:inherit; text-decoration:none; }
+  h2 { font-size:17px; margin:24px 0 10px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
+  label { display:block; font-size:14px; color:var(--dim); margin:10px 0 4px; }
+  input[type=text], select { width:100%; padding:10px; border-radius:8px; border:1px solid var(--line); background:#0c110e; color:var(--text); font-size:16px; }
+  .row { display:flex; gap:10px; align-items:center; }
+  .check { display:flex; gap:8px; align-items:center; margin-top:12px; color:var(--text); font-size:15px; }
+  button, .btn { appearance:none; border:0; border-radius:10px; padding:12px 16px; font-size:16px; font-weight:600;
+                 background:var(--accent); color:#06120b; cursor:pointer; text-decoration:none; display:inline-block; }
+  button.ghost { background:transparent; color:var(--dim); border:1px solid var(--line); font-weight:500; padding:8px 12px; font-size:14px; }
+  button:disabled { opacity:.5; }
+  .file { display:block; border:2px dashed var(--line); border-radius:12px; padding:22px; text-align:center; color:var(--dim); cursor:pointer; }
+  .file input { display:none; }
+  .bar { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:10px; }
+  .bar > div { height:100%; background:var(--accent); width:0; transition:width .3s; }
+  .hist { display:flex; gap:12px; align-items:center; text-decoration:none; color:inherit; }
+  .hist img, .hist .ph { width:56px; height:76px; object-fit:cover; border-radius:8px; background:var(--line); flex:none; }
+  .hist .t { font-weight:600; }
+  .muted { color:var(--dim); font-size:14px; }
+  .pill { display:inline-block; font-size:12px; padding:2px 8px; border-radius:20px; background:var(--line); color:var(--dim); margin-right:4px; }
+  .pill.ref { background:#2a3a5a; color:#b8cdf5; }
+  .dots span { display:inline-block; min-width:22px; text-align:center; border-radius:6px; font-size:13px; font-weight:700; margin-right:3px; padding:1px 4px; color:#0b0f0c; }
+  video { width:100%; max-height:70vh; border-radius:10px; background:#000; }
+  .chk { border-left:4px solid var(--line); }
+  .chk.good { border-left-color:var(--good); } .chk.warn { border-left-color:var(--warn); } .chk.bad { border-left-color:var(--bad); }
+  .chk .head { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+  .chk .title { font-weight:600; }
+  .status { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+  .status.good { color:var(--good); } .status.warn { color:var(--warn); } .status.bad { color:var(--bad); }
+  .val { font-size:15px; margin:4px 0; }
+  .tip { margin-top:8px; padding:8px 10px; background:#0c110e; border-radius:8px; font-size:14px; }
+  .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .grid figure { margin:0; } .grid img { width:100%; border-radius:8px; display:block; }
+  .grid figcaption { font-size:13px; color:var(--dim); margin-top:3px; text-transform:capitalize; }
+  .pair { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  td, th { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--dim); font-weight:500; }
+  .s-good { color:var(--good); } .s-warn { color:var(--warn); } .s-bad { color:var(--bad); }
+  .priority { border:1px solid var(--warn); }
+  .tips li { margin-bottom:6px; }
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+const $ = (s, el=document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const VIEW = { face_on: "Face-on", dtl: "Down-the-line", auto: "Auto" };
+const COLOR = { good: "var(--good)", warn: "var(--warn)", bad: "var(--bad)" };
+let pollTimer = null;
+const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
+                set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+  return r.json();
+}
+
+function route() {
+  clearTimeout(pollTimer);
+  const m = location.hash.match(/^#\/s\/(\w+)(?:\?ref=(\w+))?/);
+  m ? showSwing(m[1], m[2]) : showHome();
+  window.scrollTo(0, 0);
+}
+window.addEventListener("hashchange", route);
+
+function dots(c) {
+  if (!c) return "";
+  return `<span class="dots">${["good","warn","bad"].map(s => c[s] ? `<span style="background:${COLOR[s]}">${c[s]}</span>` : "").join("")}</span>`;
+}
+
+async function showHome() {
+  const app = $("#app");
+  app.innerHTML = `
+  <h1>SwingCheck</h1>
+  <div class="card">
+    <label class="file" id="drop"><input type="file" id="f" accept="video/*">
+      <div id="fname">Tap to choose or record a swing video</div></label>
+    <label>Camera angle</label>
+    <select id="view">
+      <option value="auto">Detect automatically</option>
+      <option value="face_on">Face-on (camera facing your chest)</option>
+      <option value="dtl">Down-the-line (camera behind you, toward target)</option>
+    </select>
+    <label>Label (optional)</label>
+    <input type="text" id="label" placeholder="e.g. 7 iron, range session">
+    <label class="check"><input type="checkbox" id="isref"> This is a reference swing (a pro to compare against)</label>
+    <div style="margin-top:14px"><button id="go" disabled>Analyze swing</button></div>
+    <div class="bar" id="bar" hidden><div></div></div>
+    <div class="muted" id="msg" style="margin-top:8px"></div>
+  </div>
+  <details class="card"><summary><b>Filming tips</b></summary>
+    <ul class="tips muted">
+      <li>Phone at hip height, about 10–12 ft away, whole body and club in frame for the entire swing.</li>
+      <li>Face-on: camera points at your chest, in line with the ball. Down-the-line: camera behind your hands, pointing at the target.</li>
+      <li>Keep the phone still (tripod or lean it on your bag). Only you in the shot.</li>
+      <li>One swing per clip. Trim to ~1 s before takeaway through the finish.</li>
+      <li>Slow-mo (120/240 fps) gives smoother tracking; normal video works too.</li>
+    </ul></details>
+  <h2>Swings</h2><div id="list" class="muted">Loading…</div>`;
+  $("#view").value = store.get("view", "auto");
+  $("#view").onchange = e => store.set("view", e.target.value);
+  $("#f").onchange = e => { const f = e.target.files[0]; $("#fname").textContent = f ? `${f.name} · ${(f.size/1e6).toFixed(0)} MB` : ""; $("#go").disabled = !f; };
+  $("#go").onclick = upload;
+  try {
+    const items = await api("/api/swings");
+    $("#list").innerHTML = items.length ? items.map(s => `
+      <a class="card hist" href="#/s/${s.id}">
+        ${s.thumb ? `<img src="${s.thumb}" loading="lazy">` : `<div class="ph"></div>`}
+        <div style="flex:1;min-width:0">
+          <div class="t">${esc(s.label || new Date(s.created*1000).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}))}</div>
+          <div class="muted">${s.is_reference ? '<span class="pill ref">Reference</span>' : ""}${s.view ? `<span class="pill">${VIEW[s.view]}</span>` : ""}
+          ${s.status === "done" ? dots(s.counts) : esc(s.status)}</div>
+        </div></a>`).join("") : "No swings yet.";
+  } catch (e) { $("#list").textContent = e.message; }
+}
+
+function upload() {
+  const f = $("#f").files[0]; if (!f) return;
+  const fd = new FormData();
+  fd.append("file", f); fd.append("view", $("#view").value);
+  fd.append("label", $("#label").value); fd.append("is_reference", $("#isref").checked);
+  const xhr = new XMLHttpRequest();
+  $("#go").disabled = true; $("#bar").hidden = false; $("#msg").textContent = "Uploading…";
+  xhr.upload.onprogress = e => { if (e.lengthComputable) $("#bar div").style.width = (100*e.loaded/e.total) + "%"; };
+  xhr.onload = () => {
+    if (xhr.status === 200) location.hash = `#/s/${JSON.parse(xhr.responseText).id}`;
+    else { $("#msg").textContent = (JSON.parse(xhr.responseText || "{}").detail) || `Upload failed (${xhr.status})`; $("#go").disabled = false; }
+  };
+  xhr.onerror = () => { $("#msg").textContent = "Upload failed. Check your connection."; $("#go").disabled = false; };
+  xhr.open("POST", "/api/swings"); xhr.send(fd);
+}
+
+async function showSwing(id, ref) {
+  const app = $("#app");
+  let s;
+  try { s = await api(`/api/swings/${id}${ref ? `?ref=${ref}` : ""}`); }
+  catch (e) { app.innerHTML = `<h1><a href="#/">← SwingCheck</a></h1><div class="card">${esc(e.message)}</div>`; return; }
+  const head = `<h1><a href="#/">← SwingCheck</a></h1>`;
+  if (s.status === "queued" || s.status === "processing") {
+    app.innerHTML = `${head}<div class="card"><b>${s.status === "queued" ? "Waiting in line…" : "Analyzing…"}</b>
+      <div class="bar"><div style="width:${Math.round((s.progress||0)*100)}%"></div></div>
+      <div class="muted" style="margin-top:8px">Usually 20–90 seconds depending on clip length and frame rate.</div></div>`;
+    pollTimer = setTimeout(() => showSwing(id, ref), 2000); return;
+  }
+  if (s.status === "error") {
+    app.innerHTML = `${head}<div class="card chk bad"><b>Couldn't analyze this video</b><p>${esc(s.error)}</p>
+      <button class="ghost" id="del">Delete</button></div>`;
+    $("#del").onclick = () => del(id); return;
+  }
+  const r = s.result, v = r.video;
+  const pri = r.checks.find(c => c.id === r.top_priority);
+  const cmp = s.comparison;
+  app.innerHTML = `${head}
+    <div class="muted" style="margin-bottom:8px">${s.is_reference ? '<span class="pill ref">Reference</span>' : ""}<span class="pill">${VIEW[r.view]}</span>
+      ${new Date(s.created*1000).toLocaleString()} ${s.label ? "· " + esc(s.label) : ""}</div>
+    <video src="/media/${id}/${v.video}" controls playsinline muted loop preload="metadata"></video>
+    <div class="muted" style="margin:6px 0 0">${v.fps >= 90 ? `Shown at ${Math.round(r.fps_effective / v.playback_fps)}× slow motion. ` : ""}Cyan lines mark your address position; yellow is your hand path.</div>
+    ${pri ? `<div class="card priority" style="margin-top:14px"><div class="muted">Work on this first</div>
+      <div style="font-weight:700;font-size:17px">${esc(pri.title)}</div><div class="val">${esc(pri.value_text)}</div><div class="tip">${esc(pri.tip)}</div></div>`
+      : `<div class="card" style="margin-top:14px"><b>No faults detected in what this camera angle can measure.</b></div>`}
+    <h2>Form checks ${dots(r.counts)}</h2>
+    ${r.checks.map(c => `<div class="card chk ${c.status}">
+      <div class="head"><span class="title">${esc(c.title)}</span><span class="status ${c.status}">${c.status === "warn" ? "check" : c.status}</span></div>
+      <div class="val">${esc(c.value_text)} <span class="muted">· target ${esc(c.target_text)}</span></div>
+      <div class="muted">${esc(c.detail)}${c.confidence === "low" ? " <b>Low confidence: the body parts used were hard to see.</b>" : ""}</div>
+      ${c.tip ? `<div class="tip">${esc(c.tip)}</div>` : ""}</div>`).join("")}
+    <h2>Key positions${cmp ? ` vs ${esc(cmp.ref_label)}` : ""}</h2>
+    ${s.available_refs.length > 1 ? `<select id="refsel" style="margin-bottom:10px">${s.available_refs.map(x => `<option value="${x.id}" ${cmp && cmp.ref_id === x.id ? "selected" : ""}>Compare to: ${esc(x.label)}</option>`).join("")}</select>` : ""}
+    ${cmp ? `<div>${["address","top","impact","finish"].map(p => `<div style="margin-bottom:10px"><div class="muted" style="text-transform:capitalize">${p}</div>
+        <div class="pair"><img style="width:100%;border-radius:8px" src="/media/${id}/${p}.jpg"><img style="width:100%;border-radius:8px" src="/media/${cmp.ref_id}/${p}.jpg"></div></div>`).join("")}
+        <div class="muted" style="margin-bottom:10px">Left: you · Right: ${esc(cmp.ref_label)}</div></div>
+      <h2>Numbers vs ${esc(cmp.ref_label)}</h2>
+      <div class="card"><table><tr><th></th><th>You</th><th>${esc(cmp.ref_label)}</th></tr>
+        ${cmp.rows.map(x => `<tr><td>${esc(x.title)}</td><td class="s-${x.mine_status}">${esc(x.mine)}</td><td class="s-${x.ref_status}">${esc(x.ref)}</td></tr>`).join("")}
+      </table></div>`
+    : `<div class="grid">${Object.keys(v.stills).map(p => `<figure><img src="/media/${id}/${p}.jpg"><figcaption>${p}</figcaption></figure>`).join("")}</div>
+       ${s.is_reference ? "" : `<p class="muted">Upload a pro swing filmed ${r.view === "dtl" ? "down-the-line" : "face-on"} and tick "reference swing" to compare against it here.</p>`}`}
+    <h2>Details</h2>
+    <div class="card">
+      <label>Label</label><input type="text" id="lab" value="${esc(s.label)}">
+      <label>Notes</label><input type="text" id="note" value="${esc(s.note)}" placeholder="e.g. felt good, pulled it left">
+      <label class="check"><input type="checkbox" id="isref" ${s.is_reference ? "checked" : ""}> Use as a reference swing for comparisons</label>
+      <div class="row" style="margin-top:12px"><button class="ghost" id="save">Save</button><button class="ghost" id="del" style="margin-left:auto">Delete swing</button></div>
+      <div class="muted" style="margin-top:10px">Tempo ${r.metrics.tempo_ratio}:1 · analysed at ${r.fps_effective} fps · ${r.metrics.handedness_guess}-handed (detected)</div>
+    </div>`;
+  if ($("#refsel")) $("#refsel").onchange = e => location.hash = `#/s/${id}?ref=${e.target.value}`;
+  $("#save").onclick = async () => {
+    await api(`/api/swings/${id}`, { method: "PATCH", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ label: $("#lab").value, note: $("#note").value, is_reference: $("#isref").checked }) });
+    $("#save").textContent = "Saved"; setTimeout(() => $("#save") && ($("#save").textContent = "Save"), 1500);
+  };
+  $("#del").onclick = () => del(id);
+}
+
+async function del(id) {
+  if (!confirm("Delete this swing?")) return;
+  await api(`/api/swings/${id}`, { method: "DELETE" });
+  location.hash = "#/";
+}
+route();
+</script>
+</body>
+</html>
