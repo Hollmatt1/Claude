@@ -85,7 +85,7 @@ def _summary(m: dict) -> dict:
     r = m.get("result") or {}
     out = {k: m.get(k) for k in ("id", "created", "status", "label", "note", "is_reference", "error", "kind",
                                  "index", "peak", "stage", "progress")} | {
-        "view": r.get("view") or m.get("view_hint"), "counts": r.get("counts"),
+        "view": r.get("view") or m.get("view_hint"), "counts": r.get("counts"), "tracking": r.get("tracking"),
         "thumb": f"/media/{m['id']}/address.jpg" if m.get("status") == "done" else None,
     }
     if m.get("kind") == "session":
@@ -109,7 +109,7 @@ def session_report(m: dict) -> dict:
     kids = [k for k in (_try_meta(c) for c in m.get("children", [])) if k]
     agg: dict[str, dict] = {}
     for k in kids:
-        if k["status"] != "done":
+        if k["status"] != "done" or (k["result"].get("tracking") or {}).get("grade") == "poor":
             continue
         for c in k["result"]["checks"]:
             a = agg.setdefault(c["id"], {"id": c["id"], "title": c["title"], "good": 0, "warn": 0, "bad": 0,
@@ -124,7 +124,9 @@ def session_report(m: dict) -> dict:
         v = a.pop("values")
         a["median"] = round(float(np.median(v)), 2) if v else None
         a["n"] = a["good"] + a["warn"] + a["bad"]
-    return {"swings": [_summary(k) for k in sorted(kids, key=lambda k: k.get("index", 0))], "checks": rows}
+    poor = sum(1 for k in kids if k["status"] == "done" and (k["result"].get("tracking") or {}).get("grade") == "poor")
+    return {"swings": [_summary(k) for k in sorted(kids, key=lambda k: k.get("index", 0))], "checks": rows,
+            "poor_tracking": poor, "can_reanalyze": not m.get("input_deleted") and (_dir(m["id"]) / m["input"]).exists()}
 
 
 # ------------------------------------------------------------- worker
@@ -159,7 +161,7 @@ def process(sid: str):
         result["video"] = {"fps": data["fps"], "stride": data["stride"], "width": data["width"],
                            "height": data["height"], **media}
         meta.update(status="done", progress=1.0, result=result)
-        if os.environ.get("KEEP_ORIGINALS", "0") != "1":
+        if os.environ.get("KEEP_ORIGINALS", "1") != "1":
             (d / meta["input"]).unlink(missing_ok=True)
             meta["input_deleted"] = True
     except A.AnalysisError as e:
@@ -221,7 +223,7 @@ def process_session(meta: dict):
         kids = [_try_meta(c) for c in meta["children"]]
         ok = sum(1 for k in kids if k and k["status"] == "done")
         meta.update(status="done", progress=1.0, stage=f"{ok} of {len(wins)} swings analyzed")
-        if os.environ.get("KEEP_ORIGINALS", "0") != "1":
+        if os.environ.get("KEEP_ORIGINALS", "1") != "1":
             (d / meta["input"]).unlink(missing_ok=True)
             meta["input_deleted"] = True
     except A.AnalysisError as e:
@@ -329,6 +331,26 @@ def update_swing(sid: str, body: dict):
     if "is_reference" in body:
         m["is_reference"] = bool(body["is_reference"])
     save_meta(m)
+    return _summary(m)
+
+
+@app.post("/api/swings/{sid}/reanalyze")
+def reanalyze(sid: str):
+    """Run the analysis again on the kept original (after an update to the tracking or checks)."""
+    m = load_meta(sid)
+    if m.get("session_id") or m.get("input_deleted") or not (_dir(sid) / m["input"]).exists():
+        raise HTTPException(409, "The original video wasn't kept, so this can't be re-analyzed. Upload it again.")
+    if m["status"] in ("queued", "processing"):
+        return _summary(m)
+    if m.get("kind") == "session":
+        for c in m.get("children") or []:
+            if (DATA / c).is_dir() and c.isalnum():
+                shutil.rmtree(DATA / c)
+        m.update(windows=None, children=[])
+    m.update(status="queued", progress=0.0, error=None, stage=None)
+    m.pop("result", None)
+    save_meta(m)
+    jobs.put(sid)
     return _summary(m)
 
 

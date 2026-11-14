@@ -7,7 +7,8 @@ from typing import Callable, Iterator
 import cv2
 import numpy as np
 
-MODEL_PATH = os.environ.get("POSE_MODEL", "/app/models/pose_landmarker_full.task")
+MODEL_PATH = os.environ.get("POSE_MODEL", "/app/models/pose_landmarker_heavy.task")
+SCAN_MODEL_PATH = os.environ.get("SCAN_POSE_MODEL", "/app/models/pose_landmarker_full.task")
 TARGET_FPS = 120       # process at most this many frames per second of real time
 MAX_SECONDS = 20       # ignore anything after this
 DETECT_LONG_SIDE = 960  # resize frames to this before running pose
@@ -43,13 +44,13 @@ def iter_frames(path: str, stride: int, fps: float) -> Iterator[tuple[int, np.nd
         cap.release()
 
 
-def _mediapipe_detector():
+def _mediapipe_detector(model_path: str | None = None):
     import mediapipe as mp
     from mediapipe.tasks import python as mp_python
     from mediapipe.tasks.python import vision
 
     options = vision.PoseLandmarkerOptions(
-        base_options=mp_python.BaseOptions(model_asset_path=MODEL_PATH),
+        base_options=mp_python.BaseOptions(model_asset_path=model_path or MODEL_PATH),
         running_mode=vision.RunningMode.VIDEO,
         num_poses=1,
         min_pose_detection_confidence=0.5,

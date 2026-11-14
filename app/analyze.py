@@ -48,6 +48,65 @@ def _interp_nans(a: np.ndarray) -> np.ndarray:
     return flat.reshape(out.shape)
 
 
+def _rolling_median(a: np.ndarray, window: int) -> np.ndarray:
+    """Per-coordinate NaN-aware centred median along axis 0. On smooth motion it returns the point itself."""
+    pad = window // 2
+    padded = np.pad(a, ((pad, pad),) + ((0, 0),) * (a.ndim - 1), mode="edge")
+    view = np.lib.stride_tricks.sliding_window_view(padded, window, axis=0)
+    with np.errstate(all="ignore"):
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            return np.nanmedian(view, axis=-1)
+
+
+def clean_arms(landmarks: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Repair arm tracking. Returns (landmarks with NaNs filled, per-frame bool of frames that were repaired).
+
+    1. A wrist or elbow that jumps away from its neighbours in time (more than 0.3 torso lengths from the
+       5-frame median) is dropped. On smooth motion the median is the point itself, so fast swings are kept.
+    2. An arm segment longer than 1.4x its median length is dropped (a 2D projection can shorten an arm
+       but never lengthen it).
+    3. Both hands hold the grip, so the wrists must be close. When they're more than 0.35 torso lengths
+       apart, the less visible wrist (usually the lead arm hidden behind the body) is moved onto the other.
+    """
+    lm = landmarks.copy()
+    n = len(lm)
+    sh = (lm[:, L_SH, :2] + lm[:, R_SH, :2]) / 2
+    hip = (lm[:, L_HIP, :2] + lm[:, R_HIP, :2]) / 2
+    torso = float(np.nanmedian(np.linalg.norm(sh - hip, axis=1)))
+    fixed = np.zeros(n, dtype=bool)
+    if not np.isfinite(torso) or torso <= 0:
+        return _interp_nans(lm), fixed
+
+    for j in (L_EL, R_EL, L_WR, R_WR):
+        xy = lm[:, j, :2]
+        dev = np.linalg.norm(xy - _rolling_median(xy, 5), axis=1)
+        bad = np.nan_to_num(dev, nan=0.0) > 0.3 * torso
+        lm[bad, j, :] = np.nan
+        fixed |= bad
+
+    for a, b in ((L_SH, L_EL), (L_EL, L_WR), (R_SH, R_EL), (R_EL, R_WR)):
+        seg = np.linalg.norm(lm[:, a, :2] - lm[:, b, :2], axis=1)
+        med = np.nanmedian(seg)
+        if np.isfinite(med) and med > 0:
+            bad = np.nan_to_num(seg, nan=0.0) > 1.4 * med
+            lm[bad, b, :] = np.nan
+            fixed |= bad
+
+    lm = _interp_nans(lm)
+
+    gap = np.linalg.norm(lm[:, L_WR, :2] - lm[:, R_WR, :2], axis=1) / torso
+    far = gap > 0.35
+    left_worse = lm[:, L_WR, 3] <= lm[:, R_WR, 3]
+    for f in np.flatnonzero(far):
+        bad_j, good_j = (L_WR, R_WR) if left_worse[f] else (R_WR, L_WR)
+        lm[f, bad_j, :3] = lm[f, good_j, :3]
+        lm[f, bad_j, 3] = min(lm[f, bad_j, 3], 0.4)
+    fixed |= far
+    return lm, fixed
+
+
 def _smooth(a: np.ndarray, window: int) -> np.ndarray:
     if window <= 1:
         return a
@@ -186,7 +245,8 @@ def analyze(landmarks: np.ndarray, times: np.ndarray, view: str = "auto") -> dic
 
     fps_eff = 1.0 / float(np.median(np.diff(times)))
     window = max(3, int(round(0.04 * fps_eff)) | 1)
-    lm = _smooth(_interp_nans(landmarks), window)
+    cleaned, repaired = clean_arms(landmarks)
+    lm = _smooth(cleaned, window)
     vis = lm[..., 3]
 
     torso = np.linalg.norm(_mid(lm, L_SH, R_SH) - _mid(lm, L_HIP, R_HIP), axis=1)
@@ -411,7 +471,13 @@ def analyze(landmarks: np.ndarray, times: np.ndarray, view: str = "auto") -> dic
     priority = sorted([c for c in checks if c["status"] in ("bad", "warn")], key=lambda c: order[c["status"]])
     counts = {s: sum(c["status"] == s for c in checks) for s in ("good", "warn", "bad")}
 
+    # How much of the swing (address to finish) needed arm repairs.
+    rep_pct = float(repaired[a:fin + 1].mean() * 100) if fin >= a else 0.0
+    tracking = {"repaired_pct": round(rep_pct, 1),
+                "grade": "good" if rep_pct < 8 else "fair" if rep_pct < 20 else "poor"}
+
     return {
+        "tracking": tracking,
         "view": view,
         "shoulder_ratio": round(sw_ratio, 3),
         "fps_effective": round(fps_eff, 1),

@@ -13,7 +13,9 @@ from typing import Callable
 import cv2
 import numpy as np
 
-from .pose import _mediapipe_detector
+import functools
+
+from .pose import SCAN_MODEL_PATH, _mediapipe_detector
 
 SCAN_FPS = 10            # pose samples per second of real time during the scan
 SCAN_LONG_SIDE = 480     # frame size for the scan
@@ -61,7 +63,7 @@ def probe(path: str) -> dict:
 
 
 def scan(path: str, info: dict, progress: Callable[[float], None] | None = None,
-         detector_factory: Callable = _mediapipe_detector) -> tuple[np.ndarray, np.ndarray]:
+         detector_factory: Callable = functools.partial(_mediapipe_detector, SCAN_MODEL_PATH)) -> tuple[np.ndarray, np.ndarray]:
     """Pose at SCAN_FPS over the whole video. Returns landmarks (N,33,4) in scan pixels and times (N,)."""
     w, h = info["width"], info["height"]
     s = min(1.0, SCAN_LONG_SIDE / max(w, h))

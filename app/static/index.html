@@ -64,6 +64,8 @@ const $ = (s, el=document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const VIEW = { face_on: "Face-on", dtl: "Down-the-line", auto: "Auto" };
 const COLOR = { good: "var(--good)", warn: "var(--warn)", bad: "var(--bad)" };
+const TRACK = { good: ["good", "Tracking good"], fair: ["warn", "Tracking fair"], poor: ["bad", "Tracking poor"] };
+const trackPill = t => t && t.grade !== "good" ? `<span class="pill s-${TRACK[t.grade][0]}">${TRACK[t.grade][1]}</span>` : "";
 let pollTimer = null;
 const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
                 set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
@@ -179,6 +181,7 @@ async function showSwing(id, ref) {
   app.innerHTML = `${head}
     <div class="muted" style="margin-bottom:8px">${s.is_reference ? '<span class="pill ref">Reference</span>' : ""}<span class="pill">${VIEW[r.view]}</span>
       ${new Date(s.created*1000).toLocaleString()} ${s.label ? "· " + esc(s.label) : ""}</div>
+    ${r.tracking && r.tracking.grade === "poor" ? `<div class="card chk bad" style="margin-bottom:10px">Tracking was poor on this swing (${r.tracking.repaired_pct}% of frames needed repair), so treat these numbers with caution.</div>` : ""}
     <video src="/media/${id}/${v.video}" controls playsinline muted loop preload="metadata"></video>
     <div class="muted" style="margin:6px 0 0">${v.fps >= 90 ? `Shown at ${Math.round(r.fps_effective / v.playback_fps)}× slow motion. ` : ""}Cyan lines mark your address position; yellow is your hand path.</div>
     ${pri ? `<div class="card priority" style="margin-top:14px"><div class="muted">Work on this first</div>
@@ -207,7 +210,7 @@ async function showSwing(id, ref) {
       <label>Notes</label><input type="text" id="note" value="${esc(s.note)}" placeholder="e.g. felt good, pulled it left">
       <label class="check"><input type="checkbox" id="isref" ${s.is_reference ? "checked" : ""}> Use as a reference swing for comparisons</label>
       <div class="row" style="margin-top:12px"><button class="ghost" id="save">Save</button><button class="ghost" id="del" style="margin-left:auto">Delete swing</button></div>
-      <div class="muted" style="margin-top:10px">Tempo ${r.metrics.tempo_ratio}:1 · analysed at ${r.fps_effective} fps · ${r.metrics.handedness_guess}-handed (detected)</div>
+      <div class="muted" style="margin-top:10px">Tempo ${r.metrics.tempo_ratio}:1 · analysed at ${r.fps_effective} fps · ${r.metrics.handedness_guess}-handed (detected)${r.tracking ? ` · arm tracking repaired in ${r.tracking.repaired_pct}% of frames (${r.tracking.grade})` : ""}</div>
     </div>`;
   if ($("#refsel")) $("#refsel").onchange = e => location.hash = `#/s/${id}?ref=${e.target.value}`;
   $("#save").onclick = async () => {
@@ -232,7 +235,8 @@ function showSession(s, id) {
       <div class="muted" style="margin-top:8px">Finding swings takes about a minute per 5 minutes of video, then about 20–40 s per swing.
       Swings show up below as they finish. You can close this page and come back.</div></div>` : ""}
     ${s.status === "error" ? `<div class="card chk bad"><b>Couldn't analyze this video</b><p>${esc(s.error)}</p></div>` : ""}
-    ${done.length ? `<h2>What to work on (${done.length} swings)</h2>
+    ${s.poor_tracking ? `<div class="muted" style="margin:8px 0">${s.poor_tracking} swing${s.poor_tracking > 1 ? "s" : ""} with poor tracking ${s.poor_tracking > 1 ? "are" : "is"} left out of the summary.</div>` : ""}
+    ${done.length ? `<h2>What to work on (${done.length - (s.poor_tracking || 0)} swings)</h2>
       ${top.length ? top.map((c, i) => `<div class="card ${i === 0 ? "priority" : ""}"><div style="font-weight:700">${esc(c.title)}</div>
         <div class="val">Flagged in ${c.bad + c.warn} of ${c.n} swings${c.bad ? ` (${c.bad} bad)` : ""}</div>${c.tip ? `<div class="tip">${esc(c.tip)}</div>` : ""}</div>`).join("")
         : `<div class="card"><b>No faults detected in what this camera angle can measure.</b></div>`}
@@ -244,17 +248,23 @@ function showSession(s, id) {
       <a class="card hist" href="#/s/${x.id}">
         ${x.thumb ? `<img src="${x.thumb}" loading="lazy">` : `<div class="ph"></div>`}
         <div style="flex:1;min-width:0"><div class="t">#${x.index} <span class="muted">at ${fmt(x.peak || 0)}</span></div>
-        <div class="muted">${x.status === "done" ? dots(x.counts) : x.status === "error" ? "Skipped: " + esc(x.error || "") : esc(x.status)}</div></div></a>`).join("")
+        <div class="muted">${x.status === "done" ? trackPill(x.tracking) + dots(x.counts) : x.status === "error" ? "Skipped: " + esc(x.error || "") : esc(x.status)}</div></div></a>`).join("")
       : `<div class="muted">${busy ? "None yet." : "None."}</div>`}
     <div class="card" style="margin-top:16px">
       <label>Label</label><input type="text" id="lab" value="${esc(s.label)}">
-      <div class="row" style="margin-top:12px"><button class="ghost" id="save">Save</button><button class="ghost" id="del" style="margin-left:auto">Delete session</button></div>
+      <div class="row" style="margin-top:12px"><button class="ghost" id="save">Save</button>
+        ${s.can_reanalyze && !busy ? `<button class="ghost" id="rean">Re-analyze</button>` : ""}
+        <button class="ghost" id="del" style="margin-left:auto">Delete session</button></div>
     </div>`;
   $("#save").onclick = async () => {
     await api(`/api/swings/${id}`, { method: "PATCH", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ label: $("#lab").value }) });
     $("#save").textContent = "Saved"; setTimeout(() => $("#save") && ($("#save").textContent = "Save"), 1500);
   };
   $("#del").onclick = () => del(id, "Delete this session and all its swings?");
+  if ($("#rean")) $("#rean").onclick = async () => {
+    if (!confirm("Run the analysis again on this video? The current results are replaced.")) return;
+    await api(`/api/swings/${id}/reanalyze`, { method: "POST" }); showSwing(id);
+  };
   if (busy) pollTimer = setTimeout(() => showSwing(id), 4000);
 }
 
