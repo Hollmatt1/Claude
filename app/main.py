@@ -335,6 +335,11 @@ def get_swing(sid: str, ref: str | None = None):
         refs = [r for r in all_metas() if r.get("is_reference") and r["status"] == "done" and r.get("result")
                 and r["id"] != sid and r["result"]["view"] == m["result"]["view"]]
         m["available_refs"] = [{"id": r["id"], "label": r.get("label") or "Reference"} for r in refs]
+        if not ref and refs:
+            # Prefer a reference for the same club: "8 iron" -> a reference labelled "Iron".
+            words = set((m.get("label") or "").lower().replace("·", " ").split())
+            club = next((w for w in ("driver", "wood", "hybrid", "iron", "wedge") if w in words), None)
+            refs.sort(key=lambda r: club is None or club not in (r.get("label") or "").lower())
         chosen = next((r for r in refs if r["id"] == ref), None) if ref else (refs[0] if refs else None)
         if chosen:
             m["comparison"] = {"ref_id": chosen["id"], "ref_label": chosen.get("label") or "Reference",
