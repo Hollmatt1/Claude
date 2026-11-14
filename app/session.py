@@ -66,13 +66,16 @@ def scan(path: str, info: dict, progress: Callable[[float], None] | None = None,
     w, h = info["width"], info["height"]
     s = min(1.0, SCAN_LONG_SIDE / max(w, h))
     sw, sh = max(2, int(w * s) // 2 * 2), max(2, int(h * s) // 2 * 2)
-    cmd = ["ffmpeg", "-v", "error", "-threads", "2", "-i", path, "-an", "-vf", f"fps={SCAN_FPS},scale={sw}:{sh}",
-           "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
+    # Decode only reference frames (I and P); phones put 3 B-frames between them, so this halves the
+    # decode time. Never sample faster than what's left, or duplicated frames would fake hand speed.
+    rate = min(SCAN_FPS, max(2.0, info["fps"] / 4))
+    cmd = ["ffmpeg", "-v", "error", "-threads", "2", "-skip_frame:v:0", "noref", "-i", path, "-map", "0:v:0", "-an",
+           "-vf", f"fps={rate},scale={sw}:{sh}:flags=fast_bilinear", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     detect = detector_factory()
     n_bytes = sw * sh * 3
     rows, times = [], []
-    total = max(1, int(info["duration"] * SCAN_FPS))
+    total = max(1, int(info["duration"] * rate))
     try:
         while True:
             buf = proc.stdout.read(n_bytes)
@@ -80,7 +83,7 @@ def scan(path: str, info: dict, progress: Callable[[float], None] | None = None,
                 break
             k = len(times)
             rgb = np.frombuffer(buf, np.uint8).reshape(sh, sw, 3)
-            out = detect(np.ascontiguousarray(rgb), int(k * 1000 / SCAN_FPS))
+            out = detect(np.ascontiguousarray(rgb), int(k * 1000 / rate))
             if out is None:
                 rows.append(np.full((33, 4), np.nan, np.float32))
             else:
@@ -88,7 +91,7 @@ def scan(path: str, info: dict, progress: Callable[[float], None] | None = None,
                 out[:, 0] *= sw
                 out[:, 1] *= sh
                 rows.append(out)
-            times.append(k / SCAN_FPS)
+            times.append(k / rate)
             if progress and k % 20 == 0:
                 progress(min(0.99, k / total))
     finally:
@@ -147,5 +150,5 @@ def cut(path: str, start: float, end: float, dest: str, info: dict) -> None:
     if info["fps"] > CLIP_MAX_FPS + 1:
         vf = f"fps={CLIP_MAX_FPS}," + vf
     cmd = ["ffmpeg", "-y", "-v", "error", "-threads", "2", "-ss", f"{start:.3f}", "-i", path, "-t", f"{end - start:.3f}",
-           "-an", "-vf", vf, "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18", "-pix_fmt", "yuv420p", dest]
+           "-map", "0:v:0", "-an", "-vf", vf, "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18", "-pix_fmt", "yuv420p", dest]
     subprocess.run(cmd, check=True)
