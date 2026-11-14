@@ -127,15 +127,18 @@ async function showHome() {
   $("#go").onclick = upload;
   try {
     const items = await api("/api/swings");
-    $("#list").innerHTML = items.length ? items.map(s => `
+    const card = s => `
       <a class="card hist" href="#/s/${s.id}">
         ${s.thumb ? `<img src="${s.thumb}" loading="lazy">` : `<div class="ph"></div>`}
         <div style="flex:1;min-width:0">
           <div class="t">${esc(s.label || new Date(s.created*1000).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}))}</div>
           <div class="muted">${s.kind === "session" ? '<span class="pill">Session</span>' : ""}${s.is_reference ? '<span class="pill ref">Reference</span>' : ""}${s.view ? `<span class="pill">${VIEW[s.view]}</span>` : ""}
           ${s.kind === "session" ? (s.status === "done" ? `${s.swings_done} swings` : s.status === "error" ? "error" : esc(s.stage || s.status) + (s.swings_found ? ` · ${s.swings_done}/${s.swings_found} done` : ""))
-            : s.status === "done" ? dots(s.counts) : esc(s.status)}</div>
-        </div></a>`).join("") : "No swings yet.";
+            : s.status === "done" ? (s.is_reference ? "" : dots(s.counts)) : esc(s.status)}</div>
+        </div></a>`;
+    const mine = items.filter(s => !s.is_reference), refs = items.filter(s => s.is_reference);
+    $("#list").innerHTML = (mine.length ? mine.map(card).join("") : "No swings yet.")
+      + (refs.length ? `<h2>Reference swings</h2>${refs.map(card).join("")}` : "");
   } catch (e) { $("#list").textContent = e.message; }
 }
 

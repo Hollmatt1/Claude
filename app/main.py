@@ -374,7 +374,8 @@ def get_swing(sid: str, ref: str | None = None):
         sibs = [k for k in (_try_meta(c) for c in (parent or {}).get("children", [])) if k]
         mark_practice(sibs)
         m["practice"] = next((k["practice"] for k in sibs if k["id"] == sid), False)
-    if m.get("status") == "done":
+    m["available_refs"] = []
+    if m.get("status") == "done" and not m.get("is_reference"):  # a pro's own page has nothing to compare
         refs = [r for r in all_metas() if r.get("is_reference") and r["status"] == "done" and r.get("result")
                 and r["id"] != sid and r["result"]["view"] == m["result"]["view"]]
         m["available_refs"] = [{"id": r["id"], "label": r.get("label") or "Reference"} for r in refs]
