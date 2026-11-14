@@ -35,14 +35,16 @@ sudo docker compose up -d --build
 IP=$(curl -fsS https://checkip.amazonaws.com || echo SERVER_IP)
 USER_=$(grep '^APP_USER=' .env | cut -d= -f2)
 PASS=$(grep '^APP_PASSWORD=' .env | cut -d= -f2)
+PORT=$(grep '^PORT=' .env | cut -d= -f2); PORT=${PORT:-8077}
+URL="http://$IP"; [ "$PORT" != "80" ] && URL="$URL:$PORT"
 echo
 echo "============================================================"
 echo " SwingCheck is running."
-echo " Open:     http://$IP:8077"
+echo " Open:     $URL"
 echo " Username: $USER_"
 echo " Password: $PASS"
 echo
-echo " If the page doesn't load, open port 8077 (TCP) in the"
+echo " If the page doesn't load, open port $PORT (TCP) in the"
 echo " Lightsail console: your instance > Networking > IPv4 firewall."
 echo " To update later, run this same command again."
 echo "============================================================"
