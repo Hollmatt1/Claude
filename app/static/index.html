@@ -142,35 +142,81 @@ async function showHome() {
   } catch (e) { $("#list").textContent = e.message; }
 }
 
-function sendOne(f, label, n, total) {
+const CHUNK = 16 * 1024 * 1024;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function putChunk(id, offset, blob, onProgress) {
   return new Promise((resolve, reject) => {
-    const fd = new FormData();
-    fd.append("file", f); fd.append("view", $("#view").value);
-    fd.append("label", label); fd.append("is_reference", $("#isref").checked);
     const xhr = new XMLHttpRequest();
-    const pre = total > 1 ? `Video ${n} of ${total}: ` : "";
-    xhr.upload.onprogress = e => { if (e.lengthComputable) { $("#bar div").style.width = (100*e.loaded/e.total) + "%";
-      $("#msg").textContent = `${pre}uploading… ${(e.loaded/1e6).toFixed(0)} of ${(e.total/1e6).toFixed(0)} MB. Keep this page open.`; } };
+    xhr.upload.onprogress = e => onProgress(e.loaded);
     xhr.onload = () => {
-      if (xhr.status === 200) return resolve(JSON.parse(xhr.responseText).ids);
-      let d; try { d = JSON.parse(xhr.responseText || "{}").detail; } catch {}
-      reject(new Error(`${pre}${d || `upload failed (error ${xhr.status})`}`));
+      let body = {}; try { body = JSON.parse(xhr.responseText || "{}"); } catch {}
+      if (xhr.status === 200) return resolve(body.received);
+      if (xhr.status === 409 && body.detail && typeof body.detail.received === "number") return resolve(body.detail.received);
+      const err = new Error(body.detail || `error ${xhr.status}`); err.status = xhr.status; reject(err);
     };
-    xhr.onerror = () => reject(new Error(`${pre}upload failed. Check your connection.`));
-    xhr.open("POST", "/api/swings"); xhr.send(fd);
+    xhr.onerror = () => reject(new Error("connection lost"));
+    xhr.ontimeout = () => reject(new Error("timed out"));
+    xhr.timeout = 10 * 60 * 1000;
+    xhr.open("PUT", `/api/uploads/${id}?offset=${offset}`);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.send(blob);
   });
+}
+
+// Resumable: 16 MB pieces, each retried until it lands. Picking the same file again after the page
+// was closed continues where it stopped.
+async function sendOne(f, label, n, total) {
+  const pre = total > 1 ? `Video ${n} of ${total}: ` : "";
+  const key = `upload:${f.name}:${f.size}:${f.lastModified}`;
+  const show = (done, note) => {
+    $("#bar div").style.width = (100 * done / f.size) + "%";
+    $("#msg").textContent = `${pre}${note || "uploading…"} ${(done/1e6).toFixed(0)} of ${(f.size/1e6).toFixed(0)} MB. Keep this page open.`;
+  };
+  let id = store.get(key, null), offset = 0;
+  if (id) {
+    try { offset = (await api(`/api/uploads/${id}`)).received; } catch { id = null; }
+  }
+  if (!id) {
+    const r = await api("/api/uploads", { method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ filename: f.name, size: f.size, view: $("#view").value, label,
+                             note: "", is_reference: $("#isref").checked }) });
+    id = r.upload_id; offset = 0; store.set(key, id);
+  }
+  let wait = 2000;
+  while (offset < f.size) {
+    try {
+      offset = await putChunk(id, offset, f.slice(offset, Math.min(f.size, offset + CHUNK)), l => show(offset + l));
+      wait = 2000; show(offset);
+    } catch (e) {
+      if (e.status === 404 || e.status === 413 || e.status === 400) { store.set(key, ""); throw new Error(pre + e.message); }
+      show(offset, `connection problem (${e.message}), retrying in ${Math.round(wait/1000)} s…`);
+      await sleep(wait); wait = Math.min(wait * 2, 30000);
+      try { offset = (await api(`/api/uploads/${id}`)).received; } catch {}
+    }
+  }
+  $("#msg").textContent = `${pre}finishing…`;
+  let res;
+  for (let i = 0; ; i++) {
+    try { res = await api(`/api/uploads/${id}/finish`, { method: "POST" }); break; }
+    catch (e) { if (i > 20) throw new Error(pre + e.message); await sleep(3000); }
+  }
+  store.set(key, "");
+  return res.ids;
 }
 
 async function upload() {
   const files = [...$("#f").files]; if (!files.length) return;
   const base = $("#label").value.trim();
   $("#go").disabled = true; $("#bar").hidden = false;
+  let lock = null; try { lock = await navigator.wakeLock.request("screen"); } catch {}
   let last = null, count = 0, failed = [];
   for (let i = 0; i < files.length; i++) {
     const label = files.length > 1 && base ? `${base} · video ${i + 1}` : base;
     try { const ids = await sendOne(files[i], label, i + 1, files.length); count += ids.length; last = ids[0]; }
     catch (e) { failed.push(e.message); }
   }
+  try { lock && lock.release(); } catch {}
   if (failed.length) { $("#msg").textContent = failed.join(" "); $("#go").disabled = false; return; }
   location.hash = count > 1 ? "#/" : `#/s/${last}`;
   if (count > 1) route();

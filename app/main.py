@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
@@ -268,6 +268,13 @@ def worker():
 
 @app.on_event("startup")
 def start_worker():
+    # Forget resumable uploads nobody has touched for 2 days.
+    for d in UPLOADS.iterdir() if UPLOADS.exists() else []:
+        try:
+            if time.time() - (d / "meta.json").stat().st_mtime > 2 * 86400:
+                shutil.rmtree(d)
+        except OSError:
+            pass
     for m in sorted(all_metas(), key=lambda m: m["created"]):
         if m["status"] in ("queued", "processing") and not m.get("session_id"):
             jobs.put(m["id"])
@@ -354,6 +361,100 @@ def _unzip_videos(zpath: Path, label: str, common: dict) -> list[str]:
             _register(sid, dest, name, lab, common, created=now + n * 0.001)
             ids.append(sid)
     return ids
+
+
+# ------------------------------------------------------------- resumable uploads
+# The page sends a big video in 16 MB pieces. A dropped connection or a server restart only loses the
+# piece in flight; the page asks how much arrived and carries on from there.
+
+UPLOADS = DATA.parent / "uploads"
+
+
+def _up_dir(uid: str) -> Path:
+    if not uid.isalnum():
+        raise HTTPException(404)
+    d = UPLOADS / uid
+    if not (d / "meta.json").exists():
+        raise HTTPException(404, "Upload not found")
+    return d
+
+
+def _up_status(d: Path) -> dict:
+    um = json.loads((d / "meta.json").read_text())
+    part = d / "part"
+    return {"upload_id": d.name, "size": um["size"], "received": part.stat().st_size if part.exists() else 0}
+
+
+@app.post("/api/uploads")
+def start_upload(body: dict):
+    size = int(body.get("size") or 0)
+    if size <= 0:
+        raise HTTPException(400, "Empty file")
+    if size > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(413, f"Upload is over {MAX_UPLOAD_MB} MB.")
+    view = body.get("view") if body.get("view") in ("auto", "face_on", "dtl") else "auto"
+    uid = uuid.uuid4().hex[:16]
+    d = UPLOADS / uid
+    d.mkdir(parents=True)
+    (d / "part").touch()
+    (d / "meta.json").write_text(json.dumps({
+        "size": size, "filename": str(body.get("filename") or "video.mov")[:200], "view": view,
+        "label": str(body.get("label") or "").strip()[:80], "note": str(body.get("note") or "").strip()[:500],
+        "is_reference": bool(body.get("is_reference")), "created": time.time()}))
+    return _up_status(d)
+
+
+@app.get("/api/uploads/{uid}")
+def upload_status(uid: str):
+    return _up_status(_up_dir(uid))
+
+
+@app.put("/api/uploads/{uid}")
+async def upload_chunk(uid: str, request: Request, offset: int):
+    d = _up_dir(uid)
+    st = _up_status(d)
+    if offset != st["received"]:
+        raise HTTPException(409, detail=st)
+    part = d / "part"
+    with part.open("r+b") as f:
+        f.seek(offset)
+        async for chunk in request.stream():
+            if f.tell() + len(chunk) > st["size"]:
+                f.truncate(offset)
+                raise HTTPException(400, "More data than the file size")
+            f.write(chunk)
+        f.flush()
+        os.fsync(f.fileno())
+    (d / "meta.json").touch()
+    return _up_status(d)
+
+
+@app.post("/api/uploads/{uid}/finish")
+def finish_upload(uid: str):
+    d = _up_dir(uid)
+    st = _up_status(d)
+    if st["received"] != st["size"]:
+        raise HTTPException(409, detail=st)
+    um = json.loads((d / "meta.json").read_text())
+    common = {"view_hint": um["view"], "note": um["note"], "is_reference": um["is_reference"]}
+    part = d / "part"
+    try:
+        if zipfile.is_zipfile(part):
+            ids = _unzip_videos(part, um["label"], common)
+            if not ids:
+                raise HTTPException(400, "The zip file has no videos in it.")
+        else:
+            sid = uuid.uuid4().hex[:12]
+            sd = DATA / sid
+            sd.mkdir(parents=True)
+            ext = Path(um["filename"]).suffix.lower()[:6] or ".mov"
+            dest = sd / f"input{ext}"
+            shutil.move(str(part), dest)
+            _register(sid, dest, um["filename"], um["label"], common)
+            ids = [sid]
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    return {"id": ids[0], "ids": ids}
 
 
 @app.get("/api/swings")
