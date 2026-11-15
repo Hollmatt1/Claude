@@ -36,11 +36,26 @@ MEDIA_NAMES = {"annotated.mp4"} | {f"{p}.jpg" for p in A.PHASES}
 security = HTTPBasic(auto_error=False)
 
 
-def auth(creds: HTTPBasicCredentials | None = Depends(security)):
+AUTH_COOKIE = "swingcheck_auth"
+APP_VERSION = "2026-11-15a"  # bump when index.html changes; open pages reload themselves before uploading
+
+
+def _auth_token() -> str:
+    import hashlib
+    import hmac
+    return hmac.new(APP_PASSWORD.encode(), b"swingcheck-login-v1", hashlib.sha256).hexdigest()
+
+
+def auth(request: Request, creds: HTTPBasicCredentials | None = Depends(security)):
+    """Basic auth, or the cookie set when the page was opened. Safari doesn't always attach Basic
+    credentials to background requests (a big upload then gets refused after it has started), but it
+    always sends cookies."""
     if not APP_PASSWORD:
         return
     ok = creds is not None and secrets.compare_digest(creds.username, APP_USER) and \
         secrets.compare_digest(creds.password, APP_PASSWORD)
+    if not ok:
+        ok = secrets.compare_digest(request.cookies.get(AUTH_COOKIE, ""), _auth_token())
     if not ok:
         raise HTTPException(401, "Login required", headers={"WWW-Authenticate": "Basic"})
 
@@ -354,7 +369,15 @@ def start_worker():
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
+    r = FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
+    if APP_PASSWORD:
+        r.set_cookie(AUTH_COOKIE, _auth_token(), max_age=365 * 86400, httponly=True, secure=True, samesite="lax")
+    return r
+
+
+@app.get("/api/version")
+def version():
+    return {"version": APP_VERSION}
 
 
 @app.post("/api/swings")

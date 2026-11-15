@@ -60,6 +60,7 @@
 <body>
 <main id="app"></main>
 <script>
+const APP_VERSION = "2026-11-15a";
 const $ = (s, el=document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const VIEW = { face_on: "Face-on", dtl: "Down-the-line", auto: "Auto" };
@@ -71,7 +72,7 @@ const store = { get(k, d) { try { return localStorage.getItem(k) ?? d; } catch {
                 set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
 
 async function api(path, opts) {
-  const r = await fetch(path, opts);
+  const r = await fetch(path, { credentials: "same-origin", ...opts });
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
   return r.json();
 }
@@ -167,6 +168,7 @@ function putChunk(id, offset, blob, onProgress) {
     xhr.ontimeout = () => reject(new Error("timed out"));
     xhr.timeout = 10 * 60 * 1000;
     xhr.open("PUT", `/api/uploads/${id}?offset=${offset}`);
+    xhr.withCredentials = true;
     xhr.setRequestHeader("Content-Type", "application/octet-stream");
     xhr.send(blob);
   });
@@ -197,6 +199,7 @@ async function sendOne(f, label, n, total) {
       offset = await putChunk(id, offset, f.slice(offset, Math.min(f.size, offset + CHUNK)), l => show(offset + l));
       wait = 2000; show(offset);
     } catch (e) {
+      if (e.status === 401) throw new Error(pre + "the login expired. Reload the page, log in, and pick the same file again; it continues where it stopped.");
       if (e.status === 404 || e.status === 413 || e.status === 400) { store.set(key, ""); throw new Error(pre + e.message); }
       show(offset, `connection problem (${e.message}), retrying in ${Math.round(wait/1000)} s…`);
       await sleep(wait); wait = Math.min(wait * 2, 30000);
@@ -215,6 +218,8 @@ async function sendOne(f, label, n, total) {
 
 async function upload() {
   const files = [...$("#f").files]; if (!files.length) return;
+  // An old copy of this page would upload the old way; reload first (the chosen files have to be picked again).
+  try { const v = await api("/api/version"); if (v.version !== APP_VERSION) { $("#msg").textContent = "SwingCheck was updated. Reloading — choose your videos again."; setTimeout(() => location.reload(), 1500); return; } } catch {}
   const base = $("#label").value.trim();
   $("#go").disabled = true; $("#bar").hidden = false;
   let lock = null; try { lock = await navigator.wakeLock.request("screen"); } catch {}
