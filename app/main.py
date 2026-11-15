@@ -266,6 +266,74 @@ def worker():
             traceback.print_exc()
 
 
+# ------------------------------------------------------------- iCloud Photos inbox
+# The optional `icloud` container drops new album videos into data/icloud-inbox. Each one is imported once
+# (a hard link, so no extra disk) and analyzed like an upload. The inbox files stay, so icloudpd knows
+# they're already downloaded.
+
+INBOX = DATA.parent / "icloud-inbox"
+IMPORTED = DATA.parent / "icloud-imported.json"
+ICLOUD_URL = os.environ.get("ICLOUD_INTERNAL_URL", "http://icloud:8080")
+ICLOUD_SIGNIN_URL = os.environ.get("ICLOUD_SIGNIN_URL", "")
+
+
+def _import_inbox(seen_sizes: dict):
+    if not INBOX.is_dir():
+        return
+    done = set(json.loads(IMPORTED.read_text())) if IMPORTED.exists() else set()
+    changed = False
+    for f in sorted(INBOX.iterdir(), key=lambda p: p.stat().st_mtime):
+        if f.name.startswith(".") or f.suffix.lower() not in VIDEO_EXTS or not f.is_file():
+            continue
+        size = f.stat().st_size
+        key = f"{f.name}:{size}"
+        if key in done:
+            continue
+        if seen_sizes.get(f.name) != size:  # still downloading; check again next round
+            seen_sizes[f.name] = size
+            continue
+        sid = uuid.uuid4().hex[:12]
+        sd = DATA / sid
+        sd.mkdir(parents=True)
+        dest = sd / f"input{f.suffix.lower()}"
+        try:
+            os.link(f, dest)
+        except OSError:
+            shutil.copy2(f, dest)
+        when = time.strftime("%b %-d, %Y", time.localtime(f.stat().st_mtime))
+        _register(sid, dest, f.name, f"{when} · from iCloud", {"view_hint": "auto", "note": "", "is_reference": False})
+        done.add(key)
+        changed = True
+    if changed:
+        IMPORTED.write_text(json.dumps(sorted(done)))
+
+
+def inbox_watcher():
+    seen: dict = {}
+    while True:
+        try:
+            _import_inbox(seen)
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
+        time.sleep(60)
+
+
+@app.get("/api/icloud")
+def icloud_status():
+    """Whether the iCloud album import is set up and whether Apple wants a new sign-in."""
+    import urllib.request
+    if not INBOX.is_dir() and not ICLOUD_SIGNIN_URL:
+        return {"enabled": False}
+    try:
+        page = urllib.request.urlopen(f"{ICLOUD_URL}/status", timeout=3).read().decode("utf-8", "replace")
+        needs = "<form" in page  # the page only shows a form while it waits for a password or code
+        reachable = True
+    except Exception:  # noqa: BLE001
+        needs, reachable = False, False
+    return {"enabled": True, "reachable": reachable, "needs_signin": needs, "signin_url": ICLOUD_SIGNIN_URL,
+            "album": os.environ.get("ICLOUD_ALBUM", "Golf")}
+
+
 @app.on_event("startup")
 def start_worker():
     # Forget resumable uploads nobody has touched for 2 days.
@@ -279,6 +347,7 @@ def start_worker():
         if m["status"] in ("queued", "processing") and not m.get("session_id"):
             jobs.put(m["id"])
     threading.Thread(target=worker, daemon=True).start()
+    threading.Thread(target=inbox_watcher, daemon=True).start()
 
 
 # ------------------------------------------------------------- API

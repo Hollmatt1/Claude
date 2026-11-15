@@ -9,3 +9,22 @@ services:
     volumes:
       - ./data:/data
     mem_limit: 1500m
+
+  # Optional: set COMPOSE_PROFILES=icloud and ICLOUD_USER in .env. New videos in the iCloud Photos album
+  # ICLOUD_ALBUM (default "Golf") are downloaded every 5 minutes and analyzed automatically. Sign in to
+  # Apple (password + 2FA code) on this container's page at port 8080; Apple asks again every ~2 months.
+  icloud:
+    profiles: [icloud]
+    build:
+      context: .
+      dockerfile: Dockerfile.icloud
+    restart: unless-stopped
+    command: >
+      icloudpd --username ${ICLOUD_USER:-} --directory /inbox --album "${ICLOUD_ALBUM:-Golf}"
+      --skip-photos --skip-live-photos --size original --folder-structure none
+      --cookie-directory /cookies --password-provider webui --mfa-provider webui
+      --watch-with-interval 300 --no-progress-bar --log-level info
+    volumes:
+      - ./data/icloud-inbox:/inbox
+      - ./data/icloud-cookies:/cookies
+    mem_limit: 512m

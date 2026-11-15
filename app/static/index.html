@@ -118,7 +118,15 @@ async function showHome() {
       <li>Keep the phone on the screen-on setting and the page open until the upload finishes.</li>
       <li>Slow-mo (120/240 fps) gives smoother tracking; normal video works too.</li>
     </ul></details>
+  <div id="icloud"></div>
   <h2>Swings</h2><div id="list" class="muted">Loading…</div>`;
+  api("/api/icloud").then(ic => {
+    if (!ic.enabled) return;
+    $("#icloud").innerHTML = ic.needs_signin
+      ? `<div class="card chk warn"><b>iCloud sign-in needed</b><div class="muted">Apple wants your password and a 2FA code again before new videos from the "${esc(ic.album)}" album can come in.</div>
+         ${ic.signin_url ? `<div style="margin-top:10px"><a class="btn" href="${esc(ic.signin_url)}" target="_blank">Open the sign-in page</a></div>` : ""}</div>`
+      : `<div class="card muted">Videos you add to the <b>${esc(ic.album)}</b> album in Photos show up here automatically, about 5 minutes after iCloud has them.${ic.reachable ? "" : " (The iCloud downloader isn't running.)"}</div>`;
+  }).catch(() => {});
   $("#view").value = store.get("view", "auto");
   $("#view").onchange = e => store.set("view", e.target.value);
   $("#f").onchange = e => { const fs = [...e.target.files], mb = fs.reduce((a, f) => a + f.size, 0) / 1e6;

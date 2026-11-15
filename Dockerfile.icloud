@@ -1,0 +1,4 @@
+# Downloads new videos from one iCloud Photos album into data/icloud-inbox; the app imports them.
+FROM python:3.12-slim
+RUN pip install --no-cache-dir icloudpd==1.33.0
+EXPOSE 8080
